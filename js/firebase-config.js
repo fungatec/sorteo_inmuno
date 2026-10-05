@@ -2,12 +2,12 @@
 // El apiKey de Firebase NO es un secreto: la seguridad la dan firestore.rules.
 // TODO (pegar desde Consola Firebase → Configuración del proyecto → Tus apps → SDK):
 export const firebaseConfig = {
-  apiKey: "PEGAR_AQUI",
+  apiKey: "AIzaSyD1LVtUfT2ldTDHOpn7GvP0gyyeIl364wk",
   authDomain: "sorteoinmuno.firebaseapp.com",
   projectId: "sorteoinmuno",
-  storageBucket: "PEGAR_AQUI",
-  messagingSenderId: "PEGAR_AQUI",
-  appId: "PEGAR_AQUI",
+  storageBucket: "sorteoinmuno.firebasestorage.app",
+  messagingSenderId: "383348097413",
+  appId: "1:383348097413:web:d9fbc09a9dfc29958284ec",
 };
 
 // Cuenta de admin compartida. El correo no es secreto; la contraseña NUNCA va en el código:
