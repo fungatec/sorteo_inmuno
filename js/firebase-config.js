@@ -1,6 +1,5 @@
 // Configuración pública de la app web de Firebase (proyecto sorteoinmuno).
 // El apiKey de Firebase NO es un secreto: la seguridad la dan firestore.rules.
-// TODO (pegar desde Consola Firebase → Configuración del proyecto → Tus apps → SDK):
 export const firebaseConfig = {
   apiKey: "AIzaSyD1LVtUfT2ldTDHOpn7GvP0gyyeIl364wk",
   authDomain: "sorteoinmuno.firebaseapp.com",

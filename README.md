@@ -2,7 +2,7 @@
 
 App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar a los alumnos de la clase y sortear un libro. Contexto técnico completo en [`CLAUDE.md`](CLAUDE.md).
 
-**Estado:** interfaz funcional completa (registro, acceso, panel y sorteo), reglas de seguridad y normalización probadas con el emulador y en un navegador real. **Falta pegar el `firebaseConfig`** (paso 1): mientras haya marcadores `PEGAR_AQUI`, las páginas muestran un aviso en lugar de fallar.
+**Estado:** interfaz funcional completa (registro, acceso, panel y sorteo), reglas de seguridad y normalización probadas con el emulador y en un navegador real. El `firebaseConfig` ya está pegado; si algún día vuelven marcadores `PEGAR_AQUI`, las páginas muestran un aviso en lugar de fallar.
 
 ## Cómo se usa
 
@@ -14,7 +14,7 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 
 ## Pasos manuales pendientes
 
-1. **Pegar la configuración de Firebase** en `js/firebase-config.js` (Consola → ⚙ Configuración del proyecto → Tus apps → SDK → *Config*). No es un secreto, pero tampoco se deja a medias: sustituye todos los `PEGAR_AQUI`.
+1. ~~Pegar la configuración de Firebase en `js/firebase-config.js`~~ — **hecho**.
 2. **Publicar las reglas:** Firebase Console → Firestore Database → **Reglas** → pegar el contenido completo de `firestore.rules` → **Publicar**.
 3. **Crear `config/estado`** (Firestore → Datos → *Iniciar colección* `config` → ID `estado` → campo `registroAbierto` tipo *boolean* = `false`). Sin este documento el registro queda cerrado (a propósito).
 4. **Autorizar el dominio:** Authentication → Configuración → **Dominios autorizados** → *Agregar dominio* → `fungatec.github.io` (solo el dominio, sin ruta ni `https://`; si el repositorio pasa a otro usuario/organización, usa su `<usuario>.github.io`).
