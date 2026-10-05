@@ -10,8 +10,8 @@ export const firebaseConfig = {
   appId: "PEGAR_AQUI",
 };
 
-// Cuenta de admin compartida. El correo no es secreto; la contraseña NUNCA va en el código:
-// la teclea quien inicia sesión. El login muestra "Usuario"/"Contraseña" y, si el usuario
-// escribe ADMIN_USUARIO, usa ADMIN_CORREO al llamar a Firebase Auth.
-export const ADMIN_USUARIO = "admin";
+// Cuenta de admin compartida. Ni el usuario ni el correo son secretos; la contraseña NUNCA va
+// en el código: la teclea quien inicia sesión. El login muestra "Usuario"/"Contraseña"; solo si
+// el usuario escrito es ADMIN_USUARIO se llama a Firebase Auth, con ADMIN_CORREO.
+export const ADMIN_USUARIO = "admin123";
 export const ADMIN_CORREO = "admin@admin.admin";

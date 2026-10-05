@@ -2,7 +2,7 @@
 
 ## Reglas de trabajo (leer primero)
 
-- **No hacer `git push`, abrir PR, publicar reglas ni desplegar (GitHub Pages / Firebase) sin aprobación explícita del autor.** Hacer commits locales está bien; todo lo que salga de la máquina se pide antes.
+- **Git:** el autor autoriza `git push` **solo** a la rama `claude/sweet-dijkstra-trep4b`. Nunca tocar `main`, abrir PR, publicar reglas ni desplegar (GitHub Pages / Firebase) sin aprobación explícita; el merge a `main` lo hace el autor.
 - Prioridad: que **funcione** y sea **segura** antes que añadir funciones. Nada de dependencias ni paso de compilación.
 - Si una especificación es inconsistente o ambigua, **decirlo** en lugar de resolverlo en silencio.
 - Nunca incluir en el repositorio: la lista de nombres de la clase, contraseñas ni datos de participantes (ni como ejemplo, ni en pruebas, ni en capturas). Para pruebas usar nombres ficticios.
@@ -26,10 +26,12 @@ index.html  login.html  panel.html  sorteo.html     páginas (registro · acceso
 css/styles.css                                       tokens de color + base
 js/normalizar.js                                     clave de nombre + validaciones (módulo puro)
 js/firebase.js  js/firebase-config.js                inicialización de Firebase
-js/registro.js  login.js  panel.js  sorteo.js        lógica por página (stubs)
+js/registro.js  login.js  panel.js  sorteo.js        lógica por página
+js/auth.js  js/datos.js  js/ui.js  js/azar.js        sesión de admin · acceso a Firestore · DOM seguro · aleatoriedad
 firestore.rules                                      reglas de seguridad (fuente de verdad)
-tests/normalizar.test.mjs                            node tests/normalizar.test.mjs
+tests/normalizar.test.mjs  tests/azar.test.mjs       node tests/<archivo> (sin dependencias)
 tests/reglas.emulador.mjs                            pruebas de reglas con emulador (ver README)
+tests/e2e/                                           pruebas de extremo a extremo con navegador + emuladores
 docs/CASOS_PRUEBA_REGLAS.md                          casos para el Rules Playground
 ```
 
@@ -48,12 +50,19 @@ Al **borrar** un participante hay que borrar también su `correos/{correo}` (mis
 
 ## Normalización (`js/normalizar.js`, única fuente)
 
-`claveDeNombre`: minúsculas → NFD y quitar marcas combinantes (ñ→n) → eliminar todo lo que no sea `a-z` o espacio → colapsar espacios → separar en palabras → **ordenar alfabéticamente** → unir con `-`.
-`"Jonathan Gómez Peregrina"` y `"gomez peregrina JONATHAN"` → `gomez-jonathan-peregrina`.
+`claveDeNombre`: minúsculas → **guiones y cualquier espacio en blanco → un espacio** → NFD y quitar marcas combinantes (ñ→n) → eliminar todo lo que no sea `a-z` o espacio → separar en palabras → **descartar las partículas `de`, `del`, `la`, `las`, `los`, `y`** → **ordenar alfabéticamente** → unir con `-`.
 
-**Por qué se ordenan las palabras:** los alumnos escriben nombre y apellidos en órdenes distintos (apellidos primero, o al revés); ordenar hace que la clave sea independiente del orden. Costo: dos personas con las mismas palabras en otro orden, u homónimos, colisionan (la carga de lista debe detectarlo y avisar).
+| Entrada | Clave |
+|---|---|
+| `Jonathan Gómez Peregrina` / `gomez peregrina JONATHAN` | `gomez-jonathan-peregrina` |
+| `Pérez-Gil` / `Pérez Gil` | `gil-perez` |
+| `María de los Ángeles` / `Ángeles María` | `angeles-maria` |
+| `De la Cruz` | `cruz` |
 
-Límites asumidos (documentados, no resueltos): la coincidencia es por **conjunto exacto de palabras** (omitir un apellido o añadir un segundo nombre no coincide); guiones y apóstrofos se eliminan sin dejar espacio (`Pérez-Gil` → `perezgil` ≠ `Pérez Gil`); letras no descomponibles (ß, ø) se descartan. Una clave vacía debe rechazarse.
+**Por qué se ordenan las palabras:** los alumnos escriben nombre y apellidos en órdenes distintos (apellidos primero, o al revés); ordenar hace que la clave sea independiente del orden.
+**Por qué se ignoran las partículas y se separan los guiones:** quien escribe «María de los Ángeles» o «Pérez-Gil» no debe fallar por omitir una partícula o usar espacio en lugar de guion.
+
+Límites asumidos (documentados, no resueltos): la coincidencia es por **conjunto exacto de palabras significativas** (omitir un apellido o añadir un segundo nombre no coincide); los apóstrofos se eliminan sin dejar espacio (`O'Brien` → `obrien`); letras no descomponibles (ß, ø) se descartan; una clave vacía (p. ej. «de la») debe rechazarse. **Más colisiones:** al ignorar partículas y orden, «Ana de la Cruz» y «Ana Cruz» (o dos homónimos) comparten clave. `analizarLista` las detecta y **no guarda** esas claves hasta que la admin las resuelva (alta manual).
 
 Correo: minúsculas y sin espacios, debe terminar en `@alumnos.udg.mx` (`normalizarCorreo`, `esCorreoValido`). Nombre: se guarda recortado y con espacios colapsados, 5–100 caracteres (`limpiarNombre`, `validarNombre`).
 
@@ -71,25 +80,27 @@ Resumen (el detalle comentado está en `firestore.rules`):
 
 Firestore devuelve **siempre** `permission-denied`, sin distinguir causa. Por tanto:
 - "Registro cerrado" **sí** se distingue: leer `config/estado` antes de enviar.
-- "Nombre fuera de lista" / "ya registrado" / "correo ya usado" **no** se distinguen: mostrar un mensaje único y honesto (p. ej. «No pudimos completar tu registro. Revisa que tu nombre esté escrito como en la lista de la clase y que no te hayas registrado antes; si persiste, avisa a la maestra.»).
+- "Nombre fuera de lista" / "ya registrado" / "correo ya usado" **no** se distinguen: mostrar este mensaje único (ya implementado en `js/registro.js`, con las tres causas): «No pudimos completar tu registro. Puede deberse a que tu nombre no coincide con la lista de la clase, a que ya te habías registrado o a que ese correo ya se usó. Si el problema persiste, avisa a la maestra.»
 - No abrir lecturas públicas para afinar el mensaje: permitir `get` en `lista`/`participantes`/`correos` dejaría a cualquiera confirmar por adivinanza quién pertenece a la clase o ya se registró (y filtraría correos).
 
 ### Límites conocidos (no ocultar)
 
 - No hay verificación de identidad: los nombres no son secretos y el correo no se verifica. Alguien podría registrar a un compañero (o un externo con un nombre conocido) con un correo inventado. Mitigación: la admin revisa la tabla de participantes, borra y da de alta manualmente.
 - Las reglas no pueden recalcular la clave desde `nombre`. Un cliente malicioso puede guardar un `nombre` arbitrario bajo la clave de otra persona. **La pantalla del sorteo y cualquier proyección pública deben mostrar `lista/{clave}.nombre` (oficial), nunca `participantes.nombre`.**
-- Cuenta admin compartida: la contraseña es la única barrera (el repo es público ⇒ correo y UID visibles). Debe ser fuerte y **no** `admin123`. Sin bitácora por persona.
+- Cuenta admin compartida: el usuario (`admin123`) y el correo interno **no son secretos** (el repo es público); la **contraseña** es la única barrera y debe ser fuerte (no derivada del usuario). Sin bitácora por persona.
+- **Panel:** `compararConOficial` marca cada participante con `ok`, `difiere` (misma clave, escrito distinto), `no-corresponde` (el nombre tecleado no produce la clave: posible suplantación) o `sin-oficial` (clave fuera de la lista). El panel siempre muestra el nombre **oficial** y advierte en los dos primeros casos.
 
 ## Autenticación de admin
 
-El login muestra «Usuario» y «Contraseña». Si Usuario (sin distinguir mayúsculas, recortado) es `ADMIN_USUARIO` (`admin`), se llama a `signInWithEmailAndPassword(auth, ADMIN_CORREO, contraseña)`. **La contraseña no existe en el código**: solo se teclea. Tras autenticar, verificar `getDoc(admins/{uid})`; `permission-denied`/inexistente ⇒ cerrar sesión. Todas las páginas de admin (`panel`, `sorteo`) redirigen a `login.html` sin sesión de admin.
+El login muestra «Usuario» y «Contraseña». El usuario válido es **`admin123`** (`ADMIN_USUARIO`, sin distinguir mayúsculas, recortado); solo entonces se llama a `signInWithEmailAndPassword(auth, ADMIN_CORREO, contraseña)` con `ADMIN_CORREO = admin@admin.admin`. **Cualquier otro usuario (incluido el correo directo) se rechaza antes de llamar a Firebase.** Usuario o contraseña incorrectos dan el mismo mensaje. **La contraseña no existe en el código**: solo se teclea. Tras autenticar, `getDoc(admins/{uid})`; inexistente o `permission-denied` ⇒ cerrar sesión. `panel.html` y `sorteo.html` redirigen a `login.html` sin sesión de admin (`requerirAdmin`).
 
-## Sorteo (pautas para el paso correspondiente)
+## Sorteo (implementado en `js/sorteo.js`)
 
-- Aleatoriedad con `crypto.getRandomValues` y **muestreo por rechazo** (sin sesgo de módulo); nunca `Math.random`.
-- Elegir entre participantes leídos al momento; guardar `sorteos` con `totalParticipantes`, `ganadorClave`, `ronda` y `fecha` = `serverTimestamp()` (las reglas lo exigen).
-- Rondas: por defecto se excluyen los ganadores de rondas previas del mismo evento (confirmar con el autor).
-- Mostrar solo el nombre oficial del ganador; no listar correos ni la tabla completa en pantalla pública.
+- Aleatoriedad con `crypto.getRandomValues` y **muestreo por rechazo** (`js/azar.js`, sin sesgo de módulo); nunca `Math.random` (tampoco en la animación).
+- El ganador se elige **y se guarda antes** de la animación; si el guardado falla no se revela a nadie y se puede reintentar. `sorteos` guarda `totalParticipantes` (= tamaño del grupo elegible en esa ronda, tras excluir ganadores previos), `ganadorClave`, `ronda` y `fecha` = `serverTimestamp()`.
+- Rondas: se excluyen automáticamente los ganadores de rondas guardadas. **Casilla «Ensayo»:** sortea y anima sin guardar ni excluir, con etiqueta visible «ENSAYO · no se guarda». Los sorteos guardados son inmutables (las reglas no permiten borrarlos), así que **ensaya siempre con la casilla marcada**.
+- Se muestra solo el **nombre oficial** del ganador (`lista/{clave}`; si la clave no está en la lista, el tecleado). Nunca correos ni la tabla completa.
+- Animación: acercamiento del antígeno → reconocimiento (parpadeo que se frena sobre un clon) → proliferación clonal (14 células) → nombre en verde. Respeta `prefers-reduced-motion` (revela directo).
 
 ## Identidad visual
 
@@ -120,9 +131,12 @@ Guía de textos y animación:
 ## Comandos
 
 ```bash
-node tests/normalizar.test.mjs                      # pruebas de normalización (sin dependencias)
+node tests/normalizar.test.mjs                      # normalización (sin dependencias)
+node tests/azar.test.mjs                            # aleatoriedad (sin dependencias)
 # Pruebas de reglas (requiere Java; ver README):
 npm i --no-save firebase-tools @firebase/rules-unit-testing firebase
 npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/reglas.emulador.mjs"
+# E2E (navegador + emuladores): ver cabecera de tests/e2e/e2e.mjs
 python3 -m http.server 8000                         # servir local (los módulos ES requieren http, no file://)
+# http://localhost:8000/?emulador  → conecta a los emuladores (solo en localhost; el modo se guarda por pestaña)
 ```

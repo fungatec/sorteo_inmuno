@@ -1,4 +1,5 @@
-/* Tokens de la identidad FungaTec. Ver CLAUDE.md → Identidad visual. */
+/* Identidad FungaTec. Ver CLAUDE.md → Identidad visual.
+   Texto petróleo sobre cielo/verde (blanco sobre cielo NO cumple contraste). */
 :root {
   --petroleo: #053043;   /* fondo/base, texto principal */
   --cielo: #25A9E0;      /* acción principal */
@@ -6,26 +7,119 @@
   --verde: #45AC4D;      /* éxito / ganador */
   --blanco: #ffffff;
   --superficie: #f4fcfd; /* celeste muy diluido para fondos claros */
-  --error: #b3261e;
+  --linea: #d3eef0;
+  --suave: #4d6b78;      /* texto secundario sobre claro (≈5.4:1) */
+  --alerta: #8a5a00;     /* texto de advertencia sobre fondo ámbar claro */
+  --alerta-fondo: #fff4d6;
+  --error: #a3231b;
+  --error-fondo: #fde8e6;
   --radio: 14px;
   --espacio: clamp(16px, 4vw, 32px);
   font-family: "Montserrat", system-ui, sans-serif;
 }
 * { box-sizing: border-box; }
-body { margin: 0; min-height: 100dvh; color: var(--petroleo); background: var(--superficie); line-height: 1.5; }
-main { width: min(100% - 2 * var(--espacio), 34rem); margin: 0 auto; padding-block: calc(var(--espacio) * 1.5); }
-h1 { font-weight: 700; font-size: clamp(1.5rem, 5vw, 2rem); margin: 0 0 .5rem; }
-p.lead { margin: 0 0 var(--espacio); opacity: .8; }
-nav.sitio { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .875rem; padding: 1rem var(--espacio); }
-nav.sitio a { color: var(--petroleo); }
+[hidden] { display: none !important; }
+body { margin: 0; min-height: 100dvh; color: var(--petroleo); background: var(--superficie); line-height: 1.55; }
+main { width: min(100% - 2 * var(--espacio), 34rem); margin: 0 auto; padding-block: calc(var(--espacio) * 1.5) calc(var(--espacio) * 2); }
+main.ancho { width: min(100% - 2 * var(--espacio), 60rem); }
+h1 { font-weight: 700; font-size: clamp(1.5rem, 5vw, 2rem); line-height: 1.2; margin: 0 0 .5rem; }
+h2 { font-weight: 700; font-size: 1.15rem; margin: 0 0 .75rem; }
+p { margin: 0 0 1rem; }
+p.lead { color: var(--suave); margin-bottom: calc(var(--espacio) * 1.25); }
+.suave { color: var(--suave); font-size: .875rem; }
 a { color: var(--petroleo); text-underline-offset: 3px; }
-label { display: block; font-weight: 600; margin-block: 1rem .35rem; }
-input { width: 100%; font: inherit; padding: .8rem 1rem; border: 2px solid var(--celeste); border-radius: var(--radio); background: var(--blanco); color: var(--petroleo); }
-input:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid var(--cielo); outline-offset: 2px; }
-button { font: inherit; font-weight: 600; min-height: 48px; padding: .8rem 1.5rem; border: 0; border-radius: var(--radio); cursor: pointer; background: var(--cielo); color: var(--petroleo); } /* texto petróleo sobre cielo: contraste ≈ 5.2:1 */
+
+/* Barra de administración */
+.barra { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
+  padding: .75rem var(--espacio); background: var(--petroleo); color: var(--celeste); }
+.barra a { color: var(--celeste); }
+.barra strong { font-weight: 700; }
+.barra nav { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+
+/* Formularios */
+label { display: block; font-weight: 600; margin-block: 1.1rem .35rem; }
+.ayuda { display: block; font-weight: 400; font-size: .85rem; color: var(--suave); margin-top: .15rem; }
+input, textarea { width: 100%; font: inherit; padding: .8rem 1rem; border: 2px solid var(--celeste); border-radius: var(--radio);
+  background: var(--blanco); color: var(--petroleo); }
+textarea { min-height: 9rem; resize: vertical; }
+input:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--cielo); outline-offset: 2px; }
+input[aria-invalid="true"] { border-color: var(--error); }
+button { font: inherit; font-weight: 600; min-height: 48px; padding: .75rem 1.4rem; border: 0; border-radius: var(--radio);
+  cursor: pointer; background: var(--cielo); color: var(--petroleo); }
+button:hover:not([disabled]) { filter: brightness(1.06); }
 button[disabled] { opacity: .55; cursor: not-allowed; }
-.exito { color: var(--petroleo); background: var(--verde); }
-.error { color: var(--error); }
+button.secundario { background: transparent; color: inherit; border: 2px solid currentColor; min-height: 40px; padding: .4rem 1rem; }
+button.peligro { background: transparent; color: var(--error); border: 2px solid var(--error); min-height: 40px; padding: .35rem .9rem; }
+button.exito { background: var(--verde); }
+.formulario button[type="submit"] { width: 100%; margin-top: 1.5rem; }
+.fila-botones { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+
+/* Avisos */
+.aviso { padding: .85rem 1rem; border-radius: var(--radio); margin: 1rem 0; font-size: .95rem; }
+.aviso-error { background: var(--error-fondo); color: var(--error); }
+.aviso-aviso { background: var(--alerta-fondo); color: var(--alerta); }
+.aviso-info { background: var(--celeste); color: var(--petroleo); }
+.aviso-exito { background: var(--verde); color: var(--petroleo); }
+
+/* Tarjetas y marca */
+.tarjeta { background: var(--blanco); border: 1px solid var(--linea); border-radius: var(--radio); padding: var(--espacio); margin-bottom: 1.25rem; }
+.marca { display: block; width: 56px; height: 56px; margin-bottom: 1.25rem; }
+.pie { margin-top: calc(var(--espacio) * 2); font-size: .8rem; color: var(--suave); }
+.estado-registro { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; font-size: .9rem; margin-bottom: 1.25rem; }
+.punto { width: .7rem; height: .7rem; border-radius: 50%; background: var(--suave); display: inline-block; }
+.punto.abierto { background: var(--verde); }
+.punto.cerrado { background: var(--error); }
+
+/* Registro exitoso */
+.clon-ok { text-align: center; padding-block: 1rem; }
+.clon-ok svg { width: 120px; height: 120px; }
+.clon-ok .proliferar { transform-origin: center; animation: aparecer .7s ease-out both; }
+.clon-ok .proliferar:nth-child(2) { animation-delay: .15s; }
+.clon-ok .proliferar:nth-child(3) { animation-delay: .3s; }
+.clon-ok .proliferar:nth-child(4) { animation-delay: .45s; }
+@keyframes aparecer { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* Panel */
+.resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: .75rem; margin-block: 1rem; }
+.dato { background: var(--superficie); border-radius: var(--radio); padding: .75rem 1rem; }
+.dato b { display: block; font-size: 1.6rem; line-height: 1.1; }
+.dato span { font-size: .8rem; color: var(--suave); }
+.tabs { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.tabs button { background: var(--blanco); border: 2px solid var(--celeste); min-height: 44px; padding: .4rem 1.1rem; }
+.tabs button[aria-selected="true"] { background: var(--cielo); border-color: var(--cielo); }
+.fila { display: grid; grid-template-columns: 1fr auto; gap: .25rem 1rem; align-items: start; padding: .85rem 0; border-top: 1px solid var(--linea); }
+.fila:first-child { border-top: 0; }
+.fila .nombre { font-weight: 600; overflow-wrap: anywhere; }
+.fila .meta { grid-column: 1; font-size: .85rem; color: var(--suave); overflow-wrap: anywhere; }
+.fila .accion { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.insignia { display: inline-block; font-size: .72rem; font-weight: 700; padding: .1rem .55rem; border-radius: 99px; margin-left: .4rem; vertical-align: middle; background: var(--celeste); }
+.insignia.ok { background: var(--verde); }
+.insignia.alerta { background: var(--alerta-fondo); color: var(--alerta); border: 1px solid var(--alerta); }
+.insignia.fuerte { background: var(--error-fondo); color: var(--error); border: 1px solid var(--error); }
+.advertencia { grid-column: 1; font-size: .85rem; color: var(--alerta); }
+.advertencia.fuerte { color: var(--error); font-weight: 600; }
+.vista-previa { font-size: .9rem; }
+.vista-previa ul { margin: .25rem 0 .75rem; padding-left: 1.2rem; }
+
+/* Escenario del sorteo (único fondo oscuro) */
 .escenario { background: var(--petroleo); color: var(--celeste); }
-.escenario main { text-align: center; }
+.escenario main { padding-block: var(--espacio); text-align: center; width: min(100% - 2 * var(--espacio), 56rem); }
+.escenario .suave { color: var(--celeste); opacity: .75; }
+.escenario button { background: var(--cielo); color: var(--petroleo); }
+.escenario button.secundario { background: transparent; color: var(--celeste); }
+.escenario input[type="checkbox"] { width: auto; accent-color: var(--cielo); }
+.escenario label.check { display: inline-flex; gap: .5rem; align-items: center; font-weight: 400; margin: 0; }
+.contador { font-size: clamp(2.25rem, 9vw, 3.75rem); font-weight: 700; line-height: 1; color: var(--blanco); margin: 0; }
+.campo { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 1.25rem auto; max-width: 44rem; min-height: 3rem; }
+.clon { width: 18px; height: 18px; border-radius: 50%; background: var(--celeste); opacity: .85; transition: opacity .4s, transform .4s, background .3s; }
+.clon.reconocido { background: var(--blanco); transform: scale(1.7); opacity: 1; box-shadow: 0 0 0 4px rgba(37,169,224,.6); }
+.clon.apagado { opacity: .12; }
+.clon.ganador { background: var(--verde); transform: scale(2.2); opacity: 1; }
+.expansion { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: .5rem auto; max-width: 24rem; min-height: 1px; }
+.expansion i { width: 16px; height: 16px; border-radius: 50%; background: var(--verde); animation: aparecer .5s ease-out both; }
+.ganador-nombre { font-size: clamp(2rem, 7vw, 3.5rem); font-weight: 700; color: var(--verde); line-height: 1.15; margin: .5rem 0 1rem; overflow-wrap: anywhere; animation: aparecer .8s ease-out both; }
+.etiqueta-ensayo { display: inline-block; background: var(--alerta-fondo); color: var(--alerta); font-weight: 700; padding: .15rem .8rem; border-radius: 99px; margin-bottom: 1rem; }
+.fase { min-height: 1.75rem; font-size: 1.05rem; margin-bottom: .5rem; }
+.escenario details { margin-top: 2rem; text-align: left; display: inline-block; }
+
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

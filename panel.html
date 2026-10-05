@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#053043">
   <title>Panel · Sorteo Inmunobiología</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,16 +11,69 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <nav class="sitio" aria-label="Navegación">
-    <a href="index.html">Registro</a>
-    <a href="login.html">Admin</a>
-    <a href="panel.html">Panel</a>
-    <a href="sorteo.html">Sorteo</a>
-  </nav>
-  <main>
-    <h1>Panel de administración</h1>
-    <p class="lead">Pendiente: lista de la clase, participantes y estado del registro.</p>
-    <!-- TODO: interfaz final en el paso siguiente -->
+  <header class="barra">
+    <strong>Panel de administración</strong>
+    <nav aria-label="Administración">
+      <a href="sorteo.html">Ir al sorteo</a>
+      <button type="button" class="secundario" id="salir">Salir</button>
+    </nav>
+  </header>
+
+  <main class="ancho" id="contenido" hidden>
+    <div id="aviso" class="aviso" hidden></div>
+
+    <section class="tarjeta" aria-labelledby="t-registro">
+      <h2 id="t-registro">Registro de participantes</h2>
+      <p class="estado-registro"><span class="punto" id="punto"></span><span id="estado-texto">Consultando…</span></p>
+      <div><button type="button" id="alternar">…</button></div>
+      <div class="resumen" aria-label="Resumen">
+        <div class="dato"><b id="n-lista">–</b><span>nombres en la lista</span></div>
+        <div class="dato"><b id="n-registrados">–</b><span>clones inscritos</span></div>
+        <div class="dato"><b id="n-pendientes">–</b><span>de la lista sin inscribir</span></div>
+        <div class="dato"><b id="n-alertas">–</b><span>con advertencia</span></div>
+      </div>
+    </section>
+
+    <div class="tabs" role="tablist" aria-label="Secciones">
+      <button type="button" role="tab" id="tab-b-participantes" aria-controls="tab-participantes" aria-selected="true">Participantes</button>
+      <button type="button" role="tab" id="tab-b-lista" aria-controls="tab-lista" aria-selected="false">Lista de la clase</button>
+      <button type="button" role="tab" id="tab-b-alta" aria-controls="tab-alta" aria-selected="false">Alta manual</button>
+    </div>
+
+    <section class="tarjeta" id="tab-participantes" role="tabpanel" aria-labelledby="tab-b-participantes">
+      <h2>Participantes inscritos</h2>
+      <p class="suave">Se muestra el nombre oficial de la lista. Si lo que la persona tecleó no corresponde o difiere, aparece una advertencia.</p>
+      <label class="check" style="font-weight:400;display:flex;gap:.5rem;align-items:center;margin-block:.5rem 1rem">
+        <input type="checkbox" id="solo-alertas" style="width:auto"> Mostrar solo los que tienen advertencia
+      </label>
+      <div id="participantes"></div>
+    </section>
+
+    <section class="tarjeta" id="tab-lista" role="tabpanel" aria-labelledby="tab-b-lista" hidden>
+      <h2>Cargar lista de la clase</h2>
+      <p class="suave">Un nombre completo por línea. La lista se procesa en tu navegador y solo se guarda en Firestore (no en el repositorio). Los nombres nuevos se agregan; los existentes se actualizan.</p>
+      <label for="archivo">Archivo de texto (.txt o .csv)</label>
+      <input id="archivo" type="file" accept=".txt,.csv,text/plain,text/csv">
+      <label for="texto-lista">…o pega los nombres aquí</label>
+      <textarea id="texto-lista" spellcheck="false" autocomplete="off"></textarea>
+      <div class="fila-botones"><button type="button" id="analizar">Revisar lista</button></div>
+      <div id="vista-previa" class="vista-previa" hidden></div>
+      <hr style="border:0;border-top:1px solid var(--linea);margin:1.5rem 0">
+      <h2>Lista actual</h2>
+      <div id="lista-actual"></div>
+    </section>
+
+    <section class="tarjeta" id="tab-alta" role="tabpanel" aria-labelledby="tab-b-alta" hidden>
+      <h2>Alta manual</h2>
+      <p class="suave">Para alumnos que no pudieron registrarse. Funciona aunque el registro esté cerrado y aunque el nombre no esté en la lista.</p>
+      <form id="form-alta" class="formulario" novalidate>
+        <label for="alta-nombre">Nombre completo</label>
+        <input id="alta-nombre" type="text" autocomplete="off" maxlength="100" required>
+        <label for="alta-correo">Correo institucional</label>
+        <input id="alta-correo" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" required placeholder="nombre.apellido@alumnos.udg.mx">
+        <button type="submit" id="alta-enviar">Agregar participante</button>
+      </form>
+    </section>
   </main>
   <script type="module" src="js/panel.js"></script>
 </body>

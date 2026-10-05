@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#053043">
   <title>Sorteo · Sorteo Inmunobiología</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,16 +11,43 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="escenario">
-  <nav class="sitio" aria-label="Navegación">
-    <a href="index.html">Registro</a>
-    <a href="login.html">Admin</a>
-    <a href="panel.html">Panel</a>
-    <a href="sorteo.html">Sorteo</a>
-  </nav>
-  <main>
-    <h1>Sorteo</h1>
-    <p class="lead">Pendiente: selección clonal.</p>
-    <!-- TODO: interfaz final en el paso siguiente -->
+  <header class="barra">
+    <strong>Selección clonal</strong>
+    <nav aria-label="Administración">
+      <a href="panel.html">Panel</a>
+      <button type="button" class="secundario" id="salir">Salir</button>
+    </nav>
+  </header>
+
+  <main id="contenido" hidden>
+    <div id="aviso" class="aviso" hidden></div>
+
+    <p class="suave" id="ronda">Ronda 1</p>
+    <p class="contador" id="contador" aria-live="polite">–</p>
+    <p id="contador-texto">clones en el repertorio</p>
+    <p class="suave" id="excluidos" hidden></p>
+
+    <div id="campo" class="campo" aria-hidden="true"></div>
+    <p class="fase" id="fase" aria-live="polite"></p>
+    <div id="expansion" class="expansion" aria-hidden="true"></div>
+
+    <section id="resultado" hidden aria-live="polite">
+      <span class="etiqueta-ensayo" id="etiqueta-ensayo" hidden>ENSAYO · no se guarda</span>
+      <p class="suave">El antígeno reconoció a</p>
+      <h1 class="ganador-nombre" id="ganador"></h1>
+    </section>
+
+    <div class="fila-botones" style="justify-content:center">
+      <button type="button" id="sortear" disabled>Liberar el antígeno</button>
+    </div>
+    <p style="margin-top:1rem"><label class="check"><input type="checkbox" id="ensayo"> Ensayo (no se guarda ni excluye ganadores)</label></p>
+
+    <details id="previos" hidden>
+      <summary>Ganadores de rondas anteriores</summary>
+      <ol id="lista-previos"></ol>
+    </details>
+
+    <p class="suave" style="margin-top:2.5rem;font-size:.8rem">Cada clon tiene la misma probabilidad: el azar lo define la regla del sorteo (generador criptográfico del navegador), no la inmunología.</p>
   </main>
   <script type="module" src="js/sorteo.js"></script>
 </body>

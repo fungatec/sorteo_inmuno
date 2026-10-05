@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import {
   claveDeNombre, limpiarNombre, validarNombre, normalizarCorreo, esCorreoValido,
+  compararConOficial, analizarLista,
 } from "../js/normalizar.js";
 
 const casos = [];
@@ -23,8 +24,36 @@ caso("ñ se convierte en n", () => {
 caso("espacios dobles, tabuladores y bordes", () => {
   assert.equal(claveDeNombre("  Ana   María \t López  "), "ana-lopez-maria");
 });
-caso("caracteres no alfabéticos se eliminan", () => {
-  assert.equal(claveDeNombre("María-José O'Brien 2do."), "do-mariajose-obrien");
+caso("caracteres no alfabéticos se eliminan (apóstrofos y dígitos)", () => {
+  assert.equal(claveDeNombre("María-José O'Brien 2do."), "do-jose-maria-obrien");
+});
+caso("guiones se convierten en espacio: Pérez-Gil ≡ Pérez Gil", () => {
+  assert.equal(claveDeNombre("Pérez-Gil"), "gil-perez");
+  assert.equal(claveDeNombre("Ana Pérez-Gil"), claveDeNombre("Gil Pérez Ana"));
+  assert.equal(claveDeNombre("Ana Pérez–Gil"), "ana-gil-perez"); // guion largo
+});
+caso("tabuladores separan palabras (no las pegan)", () => {
+  assert.equal(claveDeNombre("Ana\tLópez"), "ana-lopez");
+});
+caso("partículas se ignoran: María de los Ángeles", () => {
+  assert.equal(claveDeNombre("María de los Ángeles"), "angeles-maria");
+  assert.equal(claveDeNombre("Ángeles María"), "angeles-maria");
+});
+caso("partículas se ignoran: De la Cruz", () => {
+  assert.equal(claveDeNombre("De la Cruz"), "cruz");
+  assert.equal(claveDeNombre("Ana De La Cruz"), claveDeNombre("cruz ANA"));
+});
+caso("partículas: del, las, y", () => {
+  assert.equal(claveDeNombre("Juan y Pedro del Río"), "juan-pedro-rio");
+  assert.equal(claveDeNombre("Rosa de las Nieves"), "nieves-rosa");
+});
+caso("no se eliminan palabras que solo contienen una partícula", () => {
+  assert.equal(claveDeNombre("Delia Lago"), "delia-lago");
+  assert.equal(claveDeNombre("Yolanda Deloya"), "deloya-yolanda");
+});
+caso("solo partículas ⇒ clave vacía y nombre inválido", () => {
+  assert.equal(claveDeNombre("de la"), "");
+  assert.notEqual(validarNombre("de los y las"), "");
 });
 caso("entradas sin letras dan clave vacía", () => {
   assert.equal(claveDeNombre("  123 -- "), "");
@@ -54,6 +83,24 @@ caso("correos inválidos", () => {
                    "a@@alumnos.udg.mx", "a b@alumnos.udg.mx".replace(" ", "/"), "", null]) {
     assert.equal(esCorreoValido(c), false, String(c));
   }
+});
+
+caso("compararConOficial", () => {
+  const k = "gomez-jonathan-peregrina";
+  assert.equal(compararConOficial("Jonathan Gómez Peregrina", "Jonathan Gómez Peregrina", k), "ok");
+  assert.equal(compararConOficial("jonathan  gómez peregrina", "Jonathan Gómez Peregrina", k), "ok");
+  assert.equal(compararConOficial("Gomez Peregrina Jonathan", "Jonathan Gómez Peregrina", k), "difiere");
+  assert.equal(compararConOficial("Pedro Troll", "Jonathan Gómez Peregrina", k), "no-corresponde");
+  assert.equal(compararConOficial("Jonathan Gómez Peregrina", undefined, k), "sin-oficial");
+});
+caso("analizarLista: válidos, rechazados, repetidos y colisiones", () => {
+  const txt = ["\uFEFFAna López", '"Gómez Peregrina, Jonathan"', "ana lópez", "Ana", "",
+    "María de los Ángeles", "Ángeles María", "Pérez-Gil Luis", "Luis Pérez Gil"].join("\r\n");
+  const r = analizarLista(txt);
+  assert.deepEqual(r.validos.map((v) => v.clave).sort(), ["ana-lopez", "gomez-jonathan-peregrina"]);
+  assert.equal(r.repetidos, 1); // "ana lópez" repite a "Ana López"
+  assert.equal(r.rechazados.length, 1); // "Ana" (3 caracteres)
+  assert.deepEqual(r.colisiones.map((c) => c.clave).sort(), ["angeles-maria", "gil-luis-perez"]);
 });
 
 let fallos = 0;

@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#053043">
   <title>Acceso · Sorteo Inmunobiología</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -10,16 +11,28 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-  <nav class="sitio" aria-label="Navegación">
-    <a href="index.html">Registro</a>
-    <a href="login.html">Admin</a>
-    <a href="panel.html">Panel</a>
-    <a href="sorteo.html">Sorteo</a>
-  </nav>
   <main>
+    <svg class="marca" viewBox="0 0 64 64" aria-hidden="true">
+      <g stroke="#053043" stroke-width="2.5" stroke-linecap="round" fill="none">
+        <path d="M32 14V6M32 6l-4-4M32 6l4-4"/>
+        <path d="M32 14V6M32 6l-4-4M32 6l4-4" transform="rotate(90 32 32)"/>
+        <path d="M32 14V6M32 6l-4-4M32 6l4-4" transform="rotate(180 32 32)"/>
+        <path d="M32 14V6M32 6l-4-4M32 6l4-4" transform="rotate(270 32 32)"/>
+      </g>
+      <circle cx="32" cy="32" r="17" fill="#A7F0F3" stroke="#053043" stroke-width="2.5"/>
+      <circle cx="32" cy="32" r="7" fill="#053043"/>
+    </svg>
     <h1>Acceso de administración</h1>
-    <p class="lead">Pendiente: Usuario y Contraseña.</p>
-    <!-- TODO: interfaz final en el paso siguiente -->
+    <p class="lead">Solo para la maestra y la persona que organiza el sorteo.</p>
+    <div id="aviso" class="aviso" hidden></div>
+    <form id="login" class="formulario" novalidate>
+      <label for="usuario">Usuario</label>
+      <input id="usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      <label for="contrasena">Contraseña</label>
+      <input id="contrasena" name="contrasena" type="password" autocomplete="current-password" required>
+      <button type="submit" id="entrar">Entrar</button>
+    </form>
+    <p class="pie"><a href="index.html">Volver al registro</a></p>
   </main>
   <script type="module" src="js/login.js"></script>
 </body>

@@ -11,3 +11,9 @@ node_modules/
 .firebase/
 *-debug.log
 .env*
+
+# Artefactos de las pruebas e2e
+tests/e2e/fb.js
+tests/e2e/firebase.json
+tests/e2e/firestore.rules
+tests/e2e/*.log
