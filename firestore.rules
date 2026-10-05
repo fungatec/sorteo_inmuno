@@ -1,0 +1,181 @@
+rules_version = '2';
+
+// =============================================================================
+// Reglas de Firestore · Sorteo de Inmunobiología (proyecto sorteoinmuno)
+//
+// Principios:
+//  - Denegar por defecto. Cada colección lista exactamente lo que permite.
+//  - El público (sin sesión) SOLO puede crear el par participantes + correos,
+//    en un único batch, y SOLO si el nombre está en `lista` y el registro está
+//    abierto. No puede leer nada salvo config/estado.
+//  - Admin = UID presente en admins/{uid} (documento creado a mano en la consola).
+//  - Varias cláusulas `allow` sobre la misma operación se combinan con OR y un
+//    error de evaluación en una no afecta a las demás; por eso la ruta pública
+//    y la de admin están en cláusulas separadas.
+//
+// Límites conocidos (ver CLAUDE.md):
+//  - Las reglas NO pueden recalcular la clave a partir de `nombre` (no hay
+//    normalización Unicode en el lenguaje de reglas): solo comprueban que la
+//    clave exista en `lista` y que el ID coincida con el campo `clave`.
+//    Por eso la pantalla del sorteo debe mostrar lista/{clave}.nombre.
+//  - Cualquier fallo de escritura llega al cliente como `permission-denied`,
+//    sin distinguir la causa.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- helpers
+
+    // Admin si y solo si su UID existe en admins/. exists() corre con privilegios
+    // de las reglas, así que funciona aunque admins no sea legible por el público.
+    function esAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // Si config/estado no existe, get() falla y el registro queda cerrado (falla segura).
+    function registroAbierto() {
+      return get(/databases/$(database)/documents/config/estado).data.registroAbierto == true;
+    }
+
+    // Clave normalizada: palabras a-z unidas por guiones (ver js/normalizar.js).
+    function claveValida(clave) {
+      return clave is string
+        && clave.size() >= 1 && clave.size() <= 120
+        && clave.matches('^[a-z]+(-[a-z]+)*$');
+    }
+
+    // Debe coincidir con RE_CORREO de js/normalizar.js: minúsculas, sin espacios,
+    // terminado en @alumnos.udg.mx. Se usa [.] para no depender de escapes.
+    function correoValido(correo) {
+      return correo is string
+        && correo.size() <= 100
+        && correo.matches('^[a-z0-9][a-z0-9._%+-]*@alumnos[.]udg[.]mx$');
+    }
+
+    // 5-100 caracteres, sin espacio al inicio ni al final (el cliente recorta).
+    function nombreValido(nombre) {
+      return nombre is string
+        && nombre.size() >= 5 && nombre.size() <= 100
+        && nombre.matches('^[^ ].*[^ ]$');
+    }
+
+    // Documento participantes/{clave}. `origen` fija quién lo crea ("registro"|"admin").
+    // existsAfter/getAfter: exige que el doc correos/{correo} se escriba en el MISMO
+    // batch y apunte a esta clave.
+    function participanteValido(clave, origen) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['nombre', 'clave', 'correo', 'origen', 'creadoEn'])
+        && d.keys().hasAll(['nombre', 'clave', 'correo', 'origen', 'creadoEn'])
+        && claveValida(clave)
+        && d.clave == clave
+        && nombreValido(d.nombre)
+        && correoValido(d.correo)
+        && d.origen == origen
+        && d.creadoEn == request.time
+        && existsAfter(/databases/$(database)/documents/correos/$(d.correo))
+        && getAfter(/databases/$(database)/documents/correos/$(d.correo)).data.clave == clave;
+    }
+
+    // Documento correos/{correo}. Exige que participantes/{clave} se escriba en el
+    // mismo batch con este mismo correo y el mismo origen.
+    function correoDocValido(correo, origen) {
+      let d = request.resource.data;
+      return correoValido(correo)
+        && d.keys().hasOnly(['clave'])
+        && d.keys().hasAll(['clave'])
+        && claveValida(d.clave)
+        && existsAfter(/databases/$(database)/documents/participantes/$(d.clave))
+        && getAfter(/databases/$(database)/documents/participantes/$(d.clave)).data.correo == correo
+        && getAfter(/databases/$(database)/documents/participantes/$(d.clave)).data.origen == origen;
+    }
+
+    // ------------------------------------------------------------------ admins
+    // Solo lectura para admins. Nadie escribe desde el cliente (se gestiona en la consola).
+    match /admins/{uid} {
+      allow read: if esAdmin();
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------ config
+    // Único documento permitido: config/estado = { registroAbierto: boolean }.
+    match /config/estado {
+      allow get: if true;                 // el público necesita saber si el registro está abierto
+      allow read: if esAdmin();
+      allow create, update: if esAdmin()
+        && request.resource.data.keys().hasOnly(['registroAbierto'])
+        && request.resource.data.keys().hasAll(['registroAbierto'])
+        && request.resource.data.registroAbierto is bool;
+      // Sin delete: borrarlo cerraría el registro por accidente.
+    }
+
+    // ------------------------------------------------------------------- lista
+    // Nombres oficiales de la clase. Jamás legible por el público.
+    match /lista/{clave} {
+      allow read, delete: if esAdmin();
+      allow create, update: if esAdmin()
+        && claveValida(clave)
+        && request.resource.data.keys().hasOnly(['nombre'])
+        && request.resource.data.keys().hasAll(['nombre'])
+        && nombreValido(request.resource.data.nombre);
+    }
+
+    // ----------------------------------------------------------- participantes
+    match /participantes/{clave} {
+      allow read: if esAdmin();
+
+      // Registro público (sin sesión).
+      allow create: if registroAbierto()
+        && exists(/databases/$(database)/documents/lista/$(clave))
+        && !exists(/databases/$(database)/documents/participantes/$(clave))
+        && participanteValido(clave, 'registro');
+
+      // Alta manual por admin: sin exigir registro abierto ni pertenecer a la lista.
+      allow create: if esAdmin()
+        && !exists(/databases/$(database)/documents/participantes/$(clave))
+        && participanteValido(clave, 'admin');
+
+      allow delete: if esAdmin();
+      // Sin update: un participante no se edita; se borra y se vuelve a crear.
+    }
+
+    // ------------------------------------------------------------------ correos
+    // Índice que impide dos registros con el mismo correo.
+    match /correos/{correo} {
+      allow read: if esAdmin();
+
+      allow create: if registroAbierto()
+        && !exists(/databases/$(database)/documents/correos/$(correo))
+        && exists(/databases/$(database)/documents/lista/$(request.resource.data.clave))
+        && correoDocValido(correo, 'registro');
+
+      allow create: if esAdmin()
+        && !exists(/databases/$(database)/documents/correos/$(correo))
+        && correoDocValido(correo, 'admin');
+
+      allow delete: if esAdmin();
+    }
+
+    // ----------------------------------------------------------------- sorteos
+    // Solo admin; inmutables una vez creados (sin update ni delete).
+    match /sorteos/{id} {
+      allow read: if esAdmin();
+      allow create: if esAdmin()
+        && request.resource.data.keys().hasOnly(['fecha', 'totalParticipantes', 'ganadorClave', 'ronda'])
+        && request.resource.data.keys().hasAll(['fecha', 'totalParticipantes', 'ganadorClave', 'ronda'])
+        && request.resource.data.fecha == request.time
+        && request.resource.data.totalParticipantes is int
+        && request.resource.data.totalParticipantes >= 1
+        && request.resource.data.ronda is int
+        && request.resource.data.ronda >= 1
+        && claveValida(request.resource.data.ganadorClave)
+        && exists(/databases/$(database)/documents/participantes/$(request.resource.data.ganadorClave));
+    }
+
+    // -------------------------------------------------------- denegar el resto
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

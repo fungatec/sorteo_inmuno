@@ -1,0 +1,13 @@
+# La lista de la clase NUNCA se sube al repositorio; solo se carga desde el panel.
+lista*
+*.csv
+*.xlsx
+*.xls
+*.ods
+*nombres*
+alumnos*
+# Herramientas locales
+node_modules/
+.firebase/
+*-debug.log
+.env*
