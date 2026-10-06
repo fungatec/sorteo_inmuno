@@ -29,6 +29,14 @@ export function aviso(el, texto, tipo = "info") {
   el.setAttribute("role", tipo === "error" ? "alert" : "status");
 }
 
+/** Descarga un texto como archivo. Lanza si el navegador no pudo iniciar la descarga (no puede confirmar que el usuario lo guardó). */
+export function descargarArchivo(nombre, texto) {
+  const enlace = h("a", { href: URL.createObjectURL(new Blob([texto], { type: "text/plain;charset=utf-8" })), download: nombre });
+  document.body.append(enlace);
+  try { enlace.click(); } finally { enlace.remove(); }
+  setTimeout(() => URL.revokeObjectURL(enlace.href), 10000);
+}
+
 export function avisoConfigPendiente(contenedor) {
   contenedor.prepend(h("p", { class: "aviso aviso-aviso", role: "alert" },
     "Configuración de Firebase pendiente: pega tu firebaseConfig en js/firebase-config.js."));

@@ -57,6 +57,7 @@
     <div class="opciones">
       <label class="check"><input type="checkbox" id="ensayo"> Ensayo (no se guarda ni se transmite)</label>
       <p><button type="button" class="secundario" id="copiar-enlace">Copiar enlace de transmisión</button></p>
+      <p><button type="button" class="peligro" id="reiniciar" title="Borra las rondas guardadas del sorteo (descarga antes su registro) y vuelve a la ronda 1. En modo Ensayo solo reinicia la pantalla.">Reiniciar sorteo</button></p>
       <p class="suave" id="envivo-estado" role="status" hidden></p>
       <label class="check" id="etq-elenco"><input type="checkbox" id="elenco"> Mostrar primero el elenco: células de un frotis de sangre (+5 s)</label>
     </div>
@@ -68,6 +69,19 @@
 
     <p class="suave" id="nota-pie" style="margin-top:2rem;font-size:.8rem">Todos los participantes tienen la misma probabilidad (sorteo con el generador criptográfico del navegador). La escena es una ilustración didáctica. En pantalla se muestra el nombre oficial de la lista, abreviado.</p>
   </main>
+  <dialog id="dlg-reiniciar" aria-labelledby="reiniciar-titulo">
+    <form id="form-reiniciar" novalidate>
+      <h2 id="reiniciar-titulo">¿Reiniciar el sorteo?</h2>
+      <p id="reiniciar-detalle"></p>
+      <p><b>Esta acción es permanente.</b></p>
+      <label for="reiniciar-texto">Para confirmar, escribe REINICIAR</label>
+      <input id="reiniciar-texto" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <div class="fila-botones">
+        <button type="button" class="secundario" id="reiniciar-cancelar">Cancelar</button>
+        <button type="submit" class="peligro-solido" id="reiniciar-confirmar" disabled>Reiniciar sorteo</button>
+      </div>
+    </form>
+  </dialog>
   <script type="module" src="js/sorteo.js"></script>
 </body>
 </html>

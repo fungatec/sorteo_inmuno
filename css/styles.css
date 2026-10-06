@@ -379,3 +379,9 @@ a.enlace-vivo.grande { width: 100%; min-height: 56px; font-size: var(--t-lg); }
 }
 .tabla td[data-label="Origen"], .tabla td.acciones button { white-space: nowrap; }
 @media (max-width: 639px) { .tabla td[data-label="Origen"] { white-space: normal; } }
+
+/* ---- Reiniciar sorteo (sorteo.html, fondo oscuro): acción peligrosa legible y diálogo claro dentro del escenario ---- */
+.escenario button.peligro { background: transparent; color: #ff9a92; border: 2px solid #ff9a92; }
+.escenario dialog button.secundario { color: var(--petroleo); }
+.escenario dialog button.peligro-solido { background: var(--error); color: var(--blanco); }
+.escenario dialog label { margin-block: 1.1rem .35rem; }

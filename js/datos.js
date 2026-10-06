@@ -91,6 +91,19 @@ export const publicarAnimando = ({ ronda, modo, tipo }) => escribirPublico({ est
 export const publicarRevelado = ({ ronda, modo, tipo, ganadorMascara }) =>
   escribirPublico({ estado: "revelado", ronda, modo, tipo, inicio: serverTimestamp(), ganadorMascara });
 
+/**
+ * «Reiniciar sorteo»: borra SOLO los documentos de `sorteos` cuyos ids se indican (los mismos que se descargaron), en lotes de 400.
+ * No toca participantes, correos, lista ni config. Devuelve cuántos borró.
+ */
+export async function borrarSorteos(ids) {
+  for (let i = 0; i < ids.length; i += 400) {
+    const lote = writeBatch(db);
+    ids.slice(i, i + 400).forEach((id) => lote.delete(doc(db, "sorteos", id)));
+    await lote.commit();
+  }
+  return ids.length;
+}
+
 /** Borra TODOS los documentos de una colección en lotes de 400. Devuelve cuántos borró. */
 async function borrarColeccion(nombre) {
   const docs = (await getDocs(collection(db, nombre))).docs;

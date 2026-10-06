@@ -10,23 +10,28 @@
 //  - transmisión en vivo (Paso 6, ADITIVA): solo en sorteos reales y SOLO después de guardar la ronda se publica «animando»
 //    (sin ganador) y, en el instante del revelado, «revelado» con la máscara. Es best-effort: nunca se espera, nunca
 //    bloquea ni retrasa el guardado ni el revelado, y si falla solo se avisa. No se publica en el modo clásico.
+//  - «Reiniciar sorteo»: ronda y ganadores excluidos NO son estado de sesión sino lo guardado en `sorteos` (se lee al cargar);
+//    reiniciar de verdad = descargar la constancia, borrar esos documentos y limpiar el estado local. La elección y el
+//    guardado antes de revelar no se tocan.
 import { configPendiente } from "./firebase.js";
 import { requerirAdmin, cerrarSesion } from "./auth.js";
-import { leerColeccion, guardarSorteo, publicarAnimando, publicarRevelado } from "./datos.js";
+import { leerColeccion, guardarSorteo, borrarSorteos, publicarAnimando, publicarRevelado, publicarEspera } from "./datos.js";
 import { enteroAleatorio } from "./azar.js";
 import { crearEscena, FRASES } from "./escena.js";
 import { crearEscenaInmune } from "./escena-inmune.js";
 import { TARJETA } from "./contenido-cientifico.js";
 import { crearFicha } from "./ficha.js";
-import { enmascararNombre, formatoTitulo } from "./sorteo-util.js";
+import { enmascararNombre, formatoTitulo, textoRegistroSorteo, nombreArchivoRegistro } from "./sorteo-util.js";
 import { mensajeErrorGuardado } from "./errores-guardado.js";
-import { $, h, aviso, avisoConfigPendiente, copiarTexto } from "./ui.js";
+import { $, h, aviso, avisoConfigPendiente, copiarTexto, descargarArchivo } from "./ui.js";
 import { urlTransmision } from "./en-vivo-util.js";
 
 const msg = $("#aviso"), proyeccion = $("#proyeccion"), boton = $("#sortear"), btnNombre = $("#nombre-completo");
 const btnPantalla = $("#pantalla-completa"), ensayoChk = $("#ensayo"), elencoChk = $("#elenco");
+const btnReiniciar = $("#reiniciar"), dlgReiniciar = $("#dlg-reiniciar");
 
 let participantes = [], oficiales = new Map(), sorteos = [], ocupado = false;
+let reiniciando = false, pendientesEnVivo = 0;   // «Reiniciar sorteo» en curso · escrituras de la transmisión aún en la cola
 let actual = null;                       // { p, oficial, mascara, ensayo } del último ganador revelado
 const ensayoGanadores = new Set();       // en ensayo se excluyen entre sí solo durante esta sesión de pantalla
 
@@ -44,7 +49,9 @@ $("#etq-elenco").hidden = !COMPLETO;                       // el elenco (E0) sol
 btnHistoria.hidden = CLASICO || COMPLETO;                  // en los otros dos modos no hay nada que ampliar
 if (!CLASICO) $(".barra strong").textContent = "Respuesta inmune";
 /** Habilita o bloquea los botones que inician una ronda. */
-const fijarBoton = (deshabilitado) => { boton.disabled = deshabilitado; btnHistoria.disabled = deshabilitado; };
+const fijarBoton = (deshabilitado) => { boton.disabled = deshabilitado; btnHistoria.disabled = deshabilitado; refrescarReiniciar(); };
+/** «Reiniciar sorteo» solo está disponible en reposo: sin animación, sin guardar y sin publicar una ronda. */
+function refrescarReiniciar() { btnReiniciar.disabled = ocupado || reiniciando || pendientesEnVivo > 0; }
 
 const escena = CLASICO ? crearEscena($("#lienzo"), { semilla: enteroAleatorio(2 ** 32) })
                        : crearEscenaInmune($("#lienzo"), {
@@ -66,12 +73,14 @@ escena.alRevelar((info) => {
 // ---- transmisión en vivo (best-effort): cola serie para que «revelado» nunca se adelante a «animando»
 const estadoEnVivo = $("#envivo-estado");
 let colaEnVivo = Promise.resolve();
-function transmitir(escribir) {
+const ERROR_RONDA = "Transmisión en vivo: no se pudo publicar esta ronda (el sorteo en pantalla no se vio afectado). Revisa que firestore.rules esté republicada.";
+function transmitir(escribir, mensajeError = ERROR_RONDA) {
+  pendientesEnVivo++; refrescarReiniciar();
   colaEnVivo = colaEnVivo.then(escribir).catch((err) => {
     console.error("[en vivo] no se pudo publicar:", err?.code ?? err?.name ?? "desconocido");     // solo el código
-    estadoEnVivo.textContent = "Transmisión en vivo: no se pudo publicar esta ronda (el sorteo en pantalla no se vio afectado). Revisa que firestore.rules esté republicada.";
+    estadoEnVivo.textContent = mensajeError;
     estadoEnVivo.hidden = false;
-  });
+  }).finally(() => { pendientesEnVivo--; refrescarReiniciar(); });
 }
 $("#copiar-enlace").addEventListener("click", async () => {
   const url = urlTransmision(location.href);
@@ -144,6 +153,81 @@ btnNombre.addEventListener("click", () => {
 });
 
 ensayoChk.addEventListener("change", () => { if (ocupado) { ensayoChk.checked = !ensayoChk.checked; return; } ensayoGanadores.clear(); narrativaMostrada = false; preparar(); });
+
+// ------------------------------------------------------------------ reiniciar sorteo
+/** Estado local en reposo: sin ganadores de ensayo, historia completa otra vez, escena inicial con el contador. */
+function reiniciarLocal() {
+  ensayoGanadores.clear(); narrativaMostrada = false;
+  estadoEnVivo.hidden = true;
+  escena.reiniciar(); preparar();
+}
+
+/** Diálogo con la cuenta de rondas; exige escribir REINICIAR. Resuelve true solo si se confirma. */
+function confirmarReinicio(rondas) {
+  const texto = $("#reiniciar-texto"), confirmar = $("#reiniciar-confirmar"), form = $("#form-reiniciar");
+  $("#reiniciar-detalle").textContent = `Se borrarán ${rondas} ronda${rondas === 1 ? "" : "s"} guardada${rondas === 1 ? "" : "s"} del sorteo. Antes se descargará su registro (.txt). ` +
+    "Los participantes, la lista y el registro no se tocan: quienes ya ganaron volverán a ser elegibles y la siguiente ronda será la 1.";
+  texto.value = ""; confirmar.disabled = true;
+  return new Promise((resolver) => {
+    const alEscribir = () => { confirmar.disabled = texto.value.trim() !== "REINICIAR"; };
+    const alEnviar = (e) => { e.preventDefault(); if (texto.value.trim() === "REINICIAR") terminar(true); };   // segunda barrera
+    const alCancelar = () => terminar(false);
+    const alCerrar = () => terminar(false);                                                                    // Esc
+    function terminar(ok) {
+      texto.removeEventListener("input", alEscribir); form.removeEventListener("submit", alEnviar);
+      $("#reiniciar-cancelar").removeEventListener("click", alCancelar); dlgReiniciar.removeEventListener("close", alCerrar);
+      if (dlgReiniciar.open) dlgReiniciar.close();
+      resolver(ok);
+    }
+    texto.addEventListener("input", alEscribir); form.addEventListener("submit", alEnviar);
+    $("#reiniciar-cancelar").addEventListener("click", alCancelar); dlgReiniciar.addEventListener("close", alCerrar);
+    dlgReiniciar.showModal(); texto.focus();
+  });
+}
+
+async function reiniciarSorteo() {
+  if (ocupado || reiniciando || btnReiniciar.disabled) return;
+  if (ensayoChk.checked) {                                   // ensayo: solo estado local; no borra nada ni pide confirmación
+    reiniciarLocal();
+    aviso(msg, "Ensayo reiniciado. No se borró nada.", "exito");
+    return;
+  }
+  reiniciando = true; refrescarReiniciar();
+  try {
+    let docs;                                                // lectura fresca: lo que se descarga es lo que se borra
+    try { docs = await leerColeccion("sorteos"); }
+    catch (err) { console.error("[reiniciar] no se pudo leer sorteos:", err?.code ?? err?.name ?? "desconocido"); aviso(msg, "No se pudieron leer las rondas guardadas. Revisa tu conexión; no se borró nada.", "error"); return; }
+    if (!docs.length) {                                      // nada guardado: solo estado local
+      sorteos = []; reiniciarLocal();
+      aviso(msg, "Sorteo reiniciado. No había rondas guardadas.", "exito");
+      return;
+    }
+    if (!(await confirmarReinicio(docs.length))) return;
+    aviso(msg, "Descargando el registro de sorteos…", "info");
+    try {                                                    // (a) la constancia ANTES de borrar; si falla, se aborta
+      const nombreDe = (clave) => {
+        const o = oficiales.get(clave);
+        return o ? { nombre: o, oficial: true } : { nombre: participantes.find((p) => p.id === clave)?.nombre ?? clave, oficial: false };
+      };
+      descargarArchivo(nombreArchivoRegistro(), textoRegistroSorteo({ sorteos: docs, nombreDe }));
+    } catch (err) {
+      console.error("[reiniciar] no se pudo descargar el registro:", err?.name ?? "desconocido");
+      aviso(msg, "No se pudo descargar el registro de sorteos, así que no se borró nada. Inténtalo de nuevo.", "error");
+      return;
+    }
+    try { await borrarSorteos(docs.map((d) => d.id)); }
+    catch (err) {
+      console.error("[reiniciar] no se pudieron borrar las rondas:", err?.code ?? err?.name ?? "desconocido");
+      aviso(msg, "El reinicio no terminó: pudieron borrarse solo algunas rondas. Revisa tu conexión y vuelve a intentarlo (el registro ya se descargó).", "error");
+      leerColeccion("sorteos").then((s) => { sorteos = s.sort((a, b) => a.ronda - b.ronda); preparar(); }).catch(() => {});
+      return;
+    }
+    sorteos = []; reiniciarLocal();                          // (d) ronda 1 y ganadores excluidos vacíos · (f) escena inicial
+    transmitir(() => publicarEspera(), "Transmisión en vivo: no se pudo limpiar (el reinicio sí se hizo). Quien tenga el enlace podría seguir viendo la máscara del último ganador; revisa tu conexión y firestore.rules.");
+    aviso(msg, `Sorteo reiniciado: se descargó el registro y se borraron ${docs.length} ronda${docs.length === 1 ? "" : "s"}.`, "exito");
+  } finally { reiniciando = false; refrescarReiniciar(); }
+}
+btnReiniciar.addEventListener("click", reiniciarSorteo);
 
 // ------------------------------------------------------------------ sorteo
 async function sortear({ completa = false } = {}) {   // completa: botón «Sortear con historia completa» (E1–E6) en el modo por defecto
@@ -225,7 +309,7 @@ document.addEventListener("fullscreenchange", () => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.("input, textarea, select")) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.("input, textarea, select") || dlgReiniciar.open) return;
   if (e.key === "i" || e.key === "I") { ficha.alternar(); return; }
   if (ficha.abierta) return;                                          // con la ficha abierta solo funcionan I y Esc
   // Espacio/Enter ya activan de forma nativa los botones, enlaces y resúmenes enfocados.

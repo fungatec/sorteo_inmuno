@@ -9,7 +9,7 @@ import {
   analizarLista, claveDeNombre, compararConOficial, mensajeErrorNombre, mensajeErrorCorreo, normalizarCorreo,
 } from "./normalizar.js";
 import { textoRegistroSorteo, nombreArchivoRegistro, enmascararNombre } from "./sorteo-util.js";
-import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo, copiarTexto, marcarCopiado } from "./ui.js";
+import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo, copiarTexto, marcarCopiado, descargarArchivo } from "./ui.js";
 import { urlTransmision } from "./en-vivo-util.js";
 import { urlRegistro } from "./enlaces.js";
 import { dibujarQR } from "./qr.js";
@@ -291,9 +291,7 @@ async function descargarRegistro() {
     return o ? { nombre: o, oficial: true } : { nombre: participantes.find((p) => p.id === clave)?.nombre ?? clave, oficial: false };
   };
   const texto = textoRegistroSorteo({ sorteos, nombreDe });
-  const enlace = h("a", { href: URL.createObjectURL(new Blob([texto], { type: "text/plain;charset=utf-8" })), download: nombreArchivoRegistro() });
-  document.body.append(enlace); enlace.click(); enlace.remove();
-  setTimeout(() => URL.revokeObjectURL(enlace.href), 10000);
+  descargarArchivo(nombreArchivoRegistro(), texto);
   aviso(msg, `Registro descargado (${sorteos.length} ronda(s)): ${nombreArchivoRegistro()}`, "exito");
   return true;
 }

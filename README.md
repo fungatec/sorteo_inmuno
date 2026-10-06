@@ -54,7 +54,7 @@ npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/
 
 (Si `firebase.json` no existe, el emulador usa los puertos por defecto; pasa `--config` o crea uno con `{"firestore":{"rules":"firestore.rules"}}`.)
 
-De extremo a extremo (navegador real + emuladores de Auth y Firestore, 73 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
+De extremo a extremo (navegador real + emuladores de Auth y Firestore, 73 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`. El botón «Reiniciar sorteo» tiene su propio archivo, `tests/e2e/reiniciar.mjs` (11 casos).
 
 ## Desarrollo local
 
@@ -82,6 +82,17 @@ Cada participante es un **linfocito T virgen** que patrulla un ganglio linfátic
 **Fuentes:** Abbas, A. K., Lichtman, A. H., & Pillai, S. (2022); Murphy, K., & Weaver, C. (2022), *Janeway's immunobiology* (10.ª ed.); Banchereau, J., & Steinman, R. M. (1998), *Nature* 392; Kolaczkowska, E., & Kubes, P. (2013), *Nat Rev Immunol* 13; Brinkmann, V. et al. (2004), *Science* 303; Rosenberg, H. F. et al. (2013); Voehringer, D. (2013); Jenkins, M. K., & Moon, J. J. (2012), *J Immunol* 188. Las referencias completas están en `FUENTES`.
 
 **Pruebas de la animación:** E2E con ronda real (3 participantes), 100 participantes (≈ 60 fps, revelación a ≈ 30 s), `prefers-reduced-motion` y modo clásico; auditoría axe sin violaciones (incluida la ficha).
+
+## Reiniciar el sorteo (`sorteo.html`)
+
+El botón **«Reiniciar sorteo»** (rojo, bajo «Copiar enlace de transmisión»; no aparece en pantalla completa) devuelve el sorteo a la ronda 1 con todos los participantes elegibles, p. ej. después de una prueba real o para empezar de nuevo el día del evento.
+
+- **Cómo se calculan hoy la ronda y los excluidos:** no son memoria de sesión, sino lo guardado en la colección `sorteos` (se lee al abrir la pantalla): la ronda es `sorteos.length + 1` y los excluidos son los `ganadorClave` guardados. Solo los ganadores del modo Ensayo se recuerdan en memoria. Por eso un reinicio real borra esos documentos.
+- **Con «Ensayo» marcado:** reinicia solo la pantalla (ganadores de ensayo, escena inicial). No borra ni pregunta nada. Los ganadores reales guardados siguen excluidos: el ensayo nunca toca lo guardado.
+- **Sorteo real con rondas guardadas:** abre un diálogo que dice cuántas rondas se borrarán y pide escribir `REINICIAR`; luego descarga automáticamente `registro-sorteo-AAAA-MM-DD.txt` y, **solo si la descarga pudo iniciarse**, borra las rondas (por lotes), vuelve a la ronda 1 y escribe `publico/sorteo = {estado:"espera"}` (los espectadores vuelven a «Esperando el sorteo…»). Si esa última escritura falla, aparece un aviso discreto. El navegador no puede confirmar que el archivo se guardó en disco: revisa que se descargó.
+- **Con 0 rondas guardadas:** solo reinicia la pantalla y lo confirma con un aviso.
+- **No toca** participantes, correos, lista, registro abierto/cerrado ni la elección aleatoria. Usa las reglas actuales (`delete` en `sorteos`, escritura del admin en `publico/sorteo`): no hay que republicar nada.
+- Pruebas: `tests/e2e/reiniciar.mjs` (cabecera con los comandos; con `AXE_PATH` también audita axe-core a 360 px y 1080p).
 
 ## Transmisión en vivo (`en-vivo.html`)
 
