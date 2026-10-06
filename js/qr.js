@@ -1,14 +1,14 @@
 // Código QR generado EN EL NAVEGADOR (no se envía ningún dato a terceros): se dibuja en un <canvas> módulo a módulo.
-// Usa la librería «qrcode-generator» 1.4.4 (MIT), fijada por versión y cargada bajo demanda desde cdnjs solo cuando
-// la admin pulsa «Mostrar códigos QR» (el panel funciona igual sin ella). Nunca se usa innerHTML.
-export const URL_LIBRERIA_QR = "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js";
+// Usa la librería «qrcode-generator» 1.4.4 (MIT), copiada en js/vendor/ y cargada bajo demanda, desde el mismo sitio,
+// solo cuando la admin pulsa «Mostrar códigos QR». No se carga ningún script de terceros. Nunca se usa innerHTML.
+export const URL_LIBRERIA_QR = new URL("./vendor/qrcode.js", import.meta.url).href;
 
 let carga = null;
 export function cargarLibreriaQR() {
   if (globalThis.qrcode) return Promise.resolve(globalThis.qrcode);
   carga ??= new Promise((resolver, rechazar) => {
     const s = document.createElement("script");
-    s.src = URL_LIBRERIA_QR; s.crossOrigin = "anonymous"; s.referrerPolicy = "no-referrer";
+    s.src = URL_LIBRERIA_QR;
     s.onload = () => (globalThis.qrcode ? resolver(globalThis.qrcode) : rechazar(new Error("qrcode no disponible")));
     s.onerror = () => { carga = null; rechazar(new Error("no se pudo cargar la librería de QR")); };
     document.head.append(s);

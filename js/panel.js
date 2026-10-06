@@ -72,7 +72,7 @@ $("#alternar-qr").addEventListener("click", async (e) => {
     await dibujarQR($("#qr-vivo"), urlTransmision(location.href));
   } catch {
     zona.hidden = true; boton.setAttribute("aria-expanded", "false"); boton.textContent = "Mostrar códigos QR";
-    $("#qr-aviso").textContent = "No se pudo cargar el generador de códigos QR (requiere conexión a cdnjs). Los enlaces se pueden copiar con los botones.";
+    $("#qr-aviso").textContent = "No se pudo cargar el generador de códigos QR. Los enlaces se pueden copiar con los botones.";
     $("#qr-aviso").hidden = false;
   }
 });

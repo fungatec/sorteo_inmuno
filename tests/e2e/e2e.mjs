@@ -3,7 +3,6 @@
 //   cd tests/e2e && npm i --no-save firebase firebase-tools playwright-core esbuild
 //   npx esbuild fb-entry.js --bundle --format=esm --outfile=fb.js
 //   cp ../../firestore.rules . && echo '{"firestore":{"rules":"firestore.rules"}}' > firebase.json
-//   (opcional, prueba de los códigos QR sin salir a internet: npm pack qrcode-generator@1.4.4, descomprimir y QR_LIB=/ruta/package/qrcode.js)
 //   CHROMIUM_PATH=/ruta/a/chrome npx firebase emulators:exec --only firestore,auth --project sorteoinmuno "node e2e.mjs"
 import { chromium } from "playwright-core";
 import http from "node:http";
@@ -69,7 +68,6 @@ async function nuevaPagina(ctxOpts = {}) {
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
   await ctx.route(/www\.gstatic\.com\/firebasejs\/10\.14\.1\/.*/, (r) => r.fulfill({
     status: 200, contentType: "text/javascript", headers: { "Access-Control-Allow-Origin": "*" }, body: `export * from "${BASE}/__fb.js";` }));
-  if (process.env.QR_LIB) await ctx.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/qrcode-generator\/1\.4\.4\/qrcode\.min\.js/, (r) => r.fulfill({ status: 200, contentType: "text/javascript", body: readFileSync(process.env.QR_LIB, "utf8") }));
   await ctx.route("**/js/firebase-config.js", (r) => r.fulfill({ status: 200, contentType: "text/javascript", body: CONFIG_TEST }));
   const page = await ctx.newPage();
   page.errores = []; page.on("pageerror", (e) => page.errores.push(e.message));
@@ -431,14 +429,14 @@ async function subtitulos(pg, ms = 60000) {
   });
   await prueba("PASO 7B · panel: códigos QR generados en el navegador (canvas con módulos oscuros) y mensaje amable si la librería no carga", async () => {
     const m = await p.context().newPage(); await m.goto(`${BASE}/panel.html?emulador`); await m.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
-    if (process.env.QR_LIB) {
+    {
       await m.click("#alternar-qr"); await m.waitForSelector("#qr-zona:not([hidden])");
       await m.waitForFunction(() => { const c = document.querySelector("#qr-vivo"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; for (let i = 0; i < d.length; i += 4) if (d[i] < 50) return true; return false; });
       const oscuros = await m.evaluate(() => ["#qr-registro", "#qr-vivo"].map((id) => { const c = document.querySelector(id), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 50) n++; return n; }));
       assert.ok(oscuros.every((n) => n > 2000), oscuros.join(","));
       assert.equal(await m.getAttribute("#alternar-qr", "aria-expanded"), "true");
-    } else console.log("   [info] QR_LIB no definido: se omite la comprobación del dibujo del QR");
-    const f = await p.context().newPage(); await f.context().route(/cdnjs\.cloudflare\.com\/.*qrcode\.min\.js/, (r) => r.abort());
+    }
+    const f = await p.context().newPage(); await f.context().route(/\/js\/vendor\/qrcode\.js/, (r) => r.abort());
     await f.goto(`${BASE}/panel.html?emulador`); await f.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
     await f.evaluate(() => { delete globalThis.qrcode; });
     await f.click("#alternar-qr"); await f.waitForFunction(() => !document.querySelector("#qr-aviso").hidden);
