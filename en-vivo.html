@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#053043">
+  <title>Sorteo en vivo · Sorteo Inmunobiología</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="escenario envivo">
+  <header class="barra">
+    <strong>Sorteo en vivo</strong>
+    <nav aria-label="Navegación"><a href="index.html">Inscribir mi linfocito</a></nav>
+  </header>
+  <main class="envivo-main">
+    <p class="conexion" id="conexion" role="status" hidden></p>
+    <section class="pantalla-ev" aria-label="Transmisión del sorteo">
+      <canvas id="lienzo-ev" aria-hidden="true"></canvas>
+      <div class="textos-ev" aria-live="polite" aria-atomic="false">
+        <h1 id="titulo-ev">Esperando el sorteo…</h1>
+        <p id="subtitulo-ev"></p>
+      </div>
+      <div class="revelado-ev" id="revelado-ev" aria-live="polite" hidden>
+        <h2 class="mascara-ev" id="mascara-ev"></h2>
+        <p id="tipo-ev"></p>
+      </div>
+    </section>
+    <p class="suave pie-ev">Ilustración didáctica: no identifica a nadie hasta el revelado. Todos los participantes tienen la misma probabilidad. Se muestra solo la máscara del nombre del ganador.</p>
+  </main>
+  <script type="module" src="js/en-vivo.js"></script>
+</body>
+</html>

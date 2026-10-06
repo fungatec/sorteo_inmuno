@@ -51,13 +51,20 @@ Cuerpo base de un participante (`creadoEn` = `request.time`):
 | 16 | **create** `/participantes/prueba-uno` — nombre con marcado o comillas | `nombre: "<img src=x onerror=alert(1)>"` (o `Ana & López`, `Ana "Lola" López`, `Ana 'Lola' López`, `Ana “López”`) y el resto como el caso 1 | **Denegado** (antes del Paso 4 se aceptaba) |
 | 17 | **create** `/lista/prueba-tres` — admin, `nombre` con `<`, `>`, `&` o comillas | — | **Denegado** |
 
+| 18 | **get** `/publico/sorteo` — sin autenticar | — | **Permitido** |
+| 19 | **list** de la colección `/publico`, o **create/update/delete** de `/publico/sorteo` sin autenticar o como no-admin | — | **Denegado** |
+| 20 | **create/update** `/publico/sorteo` — admin | `{estado:"animando", ronda:1, modo:"resumido", tipo:"CD8", inicio:request.time}` | **Permitido** |
+| 21 | Igual que 20 con `ganadorMascara` en `animando`, o con `ganadorClave`, o `tipo:"CD3"`, o `modo:"clasico"` | — | **Denegado** |
+| 22 | **create/update** — admin | `{estado:"revelado", ronda:1, modo:"resumido", tipo:"CD8", inicio:request.time, ganadorMascara:"Marta E. R."}` | **Permitido** (con `<`, `>`, `&`, comillas, vacío o > 60 caracteres: **Denegado**) |
+| 23 | **create/update** — admin | `{estado:"espera"}` (lo que deja «Vaciar datos») | **Permitido** |
+
 Casos extra recomendados: campo adicional (`x:1`) → Denegado; `origen:"admin"` sin ser admin → Denegado; `nombre` de 4 caracteres → Denegado; `update` o `delete` de un participante sin ser admin → Denegado.
 
 ## Limpieza
 
 Borra `lista/prueba-*`, `participantes/prueba-*`, `correos/*prueba*`, `correos/fuera.lista@…` y confirma que `config/estado` queda como corresponda.
 
-## Equivalencia con los casos del Paso 1 en la suite del emulador (`tests/reglas.emulador.mjs`, 57 casos)
+## Equivalencia con los casos del Paso 1 en la suite del emulador (`tests/reglas.emulador.mjs`, 62 casos)
 
 | Caso del Paso 1 | Prueba del emulador (resultado esperado) |
 |---|---|

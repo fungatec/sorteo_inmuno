@@ -150,6 +150,63 @@ await prueba("sorteos: admin puede borrar (vaciado); público no", async () => {
   await assertFails(deleteDoc(doc(publico(), "sorteos/s1")));
   await assertSucceeds(deleteDoc(doc(admin(), "sorteos/s1")));
 });
+await sembrar();
+const PUB = { estado: "animando", ronda: 1, modo: "resumido", tipo: "CD8", inicio: serverTimestamp() };
+const REV = { ...PUB, estado: "revelado", ganadorMascara: "Marta E. R. V. S." };
+await prueba("publico/sorteo: el público LEE (get) pero no lista, no escribe ni borra", async () => {
+  await assertSucceeds(setDoc(doc(admin(), "publico/sorteo"), { estado: "espera" }));
+  await assertSucceeds(getDoc(doc(publico(), "publico/sorteo")));
+  await assertSucceeds(getDoc(doc(otro(), "publico/sorteo")));
+  await assertFails(getDocs(collection(publico(), "publico")));
+  await assertFails(getDocs(collection(otro(), "publico")));
+  await assertFails(setDoc(doc(publico(), "publico/sorteo"), { estado: "espera" }));
+  await assertFails(setDoc(doc(publico(), "publico/sorteo"), PUB));
+  await assertFails(setDoc(doc(otro(), "publico/sorteo"), { estado: "espera" }));
+  await assertFails(deleteDoc(doc(publico(), "publico/sorteo")));
+  await assertFails(deleteDoc(doc(otro(), "publico/sorteo")));
+  await assertFails(getDoc(doc(publico(), "publico/otro")));
+  await assertFails(setDoc(doc(admin(), "publico/otro"), { estado: "espera" }));
+});
+await prueba("publico/sorteo: el admin escribe espera → animando → revelado (y puede borrar)", async () => {
+  const d = doc(admin(), "publico/sorteo");
+  await assertSucceeds(setDoc(d, { estado: "espera" }));
+  await assertSucceeds(setDoc(d, PUB));
+  await assertSucceeds(setDoc(d, REV));
+  await assertSucceeds(setDoc(d, { ...REV, modo: "completo", tipo: "CD4", ronda: 2 }));
+  await assertSucceeds(setDoc(d, { estado: "espera" }));
+  await assertSucceeds(deleteDoc(d));
+});
+await prueba("publico/sorteo: ganadorMascara se rechaza en «animando» y en «espera»; «revelado» la exige", async () => {
+  const d = doc(admin(), "publico/sorteo");
+  await assertFails(setDoc(d, { ...PUB, ganadorMascara: "Marta E. R." }));
+  await assertFails(setDoc(d, { estado: "espera", ganadorMascara: "Marta E. R." }));
+  const { ganadorMascara, ...sinMascara } = REV;
+  await assertFails(setDoc(d, sinMascara));
+});
+await prueba("publico/sorteo: nunca admite la clave ni otros campos; tipos y valores validados", async () => {
+  const d = doc(admin(), "publico/sorteo");
+  await assertFails(setDoc(d, { ...PUB, ganadorClave: "lopez-maria" }));
+  await assertFails(setDoc(d, { ...REV, ganadorClave: "lopez-maria" }));
+  await assertFails(setDoc(d, { ...REV, nombre: "María López" }));
+  await assertFails(setDoc(d, { estado: "otro" }));
+  await assertFails(setDoc(d, { ...PUB, ronda: "1" }));
+  await assertFails(setDoc(d, { ...PUB, ronda: 0 }));
+  await assertFails(setDoc(d, { ...PUB, ronda: 1.5 }));
+  await assertFails(setDoc(d, { ...PUB, modo: "clasico" }));
+  await assertFails(setDoc(d, { ...PUB, tipo: "CD3" }));
+  await assertFails(setDoc(d, { ...PUB, inicio: Timestamp.fromDate(new Date(2020, 0, 1)) }));
+  const { inicio, ...sinInicio } = PUB;
+  await assertFails(setDoc(d, sinInicio));
+  await assertFails(setDoc(d, { estado: "espera", ronda: 1 }));
+  await assertFails(setDoc(d, {}));
+});
+await prueba("publico/sorteo: la máscara rechaza < > & comillas, vacío y más de 60 caracteres", async () => {
+  const d = doc(admin(), "publico/sorteo");
+  for (const m of ["<img src=x onerror=alert(1)>", "Ana & Luis", 'Ana "L."', "Ana 'L.'", "Ana \u201CL.\u201D", "Ana `L.`", "", "A".repeat(61)])
+    await assertFails(setDoc(d, { ...REV, ganadorMascara: m }));
+  await assertSucceeds(setDoc(d, { ...REV, ganadorMascara: "Ana" }));
+  await assertSucceeds(setDoc(d, { ...REV, ganadorMascara: "A".repeat(60) }));
+});
 await prueba("colección desconocida denegada incluso a admin", () => assertFails(setDoc(doc(admin(), "otra/x"), { a: 1 })));
 
 console.log(`\n${total - fallos}/${total} pruebas de reglas pasaron`);

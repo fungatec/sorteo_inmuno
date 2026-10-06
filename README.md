@@ -18,7 +18,7 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 > Lista completa para publicar, probar en el celular y operar el evento: [`docs/CHECKLIST_PUBLICACION.md`](docs/CHECKLIST_PUBLICACION.md).
 
 1. ~~Pegar la configuración de Firebase en `js/firebase-config.js`~~ — **hecho**.
-2. **Publicar las reglas** (otra vez, si ya las publicaste: el Paso 2 permite al admin borrar `sorteos`, el Paso 3 exige `adminUid` al crearlos y el Paso 4 rechaza `< > &` y comillas en los nombres): Firebase Console → Firestore Database → **Reglas** → pegar el contenido completo de `firestore.rules` → **Publicar**. Sin esto, el sorteo no se puede guardar y el vaciado falla.
+2. **Publicar las reglas** (otra vez, si ya las publicaste: el Paso 2 permite al admin borrar `sorteos`, el Paso 3 exige `adminUid` al crearlos y el Paso 4 rechaza `< > &` y comillas en los nombres y el Paso 6 añade `publico/sorteo` para la transmisión en vivo; sin esta última, el sorteo funciona igual pero la transmisión no publica): Firebase Console → Firestore Database → **Reglas** → pegar el contenido completo de `firestore.rules` → **Publicar**. Sin esto, el sorteo no se puede guardar y el vaciado falla.
 3. **Crear `config/estado`** (Firestore → Datos → *Iniciar colección* `config` → ID `estado` → campo `registroAbierto` tipo *boolean* = `false`). Sin este documento el registro queda cerrado (a propósito).
 4. **Autorizar el dominio:** Authentication → Configuración → **Dominios autorizados** → *Agregar dominio* → `fungatec.github.io` (solo el dominio, sin ruta ni `https://`; si el repositorio pasa a otro usuario/organización, usa su `<usuario>.github.io`).
 5. **Activar GitHub Pages:** repositorio → Settings → Pages → *Deploy from a branch* → rama `main`, carpeta `/ (root)`. Con plan gratuito el repositorio debe ser **público**. Enlace a compartir: `https://fungatec.github.io/sorteo_inmuno/`.
@@ -36,6 +36,7 @@ node tests/sorteo-util.test.mjs       # máscara, formato título y registro des
 node tests/login-errores.test.mjs     # errores del login (sin dependencias)
 node tests/errores-guardado.test.mjs  # errores al guardar la ronda (sin dependencias)
 node tests/contenido-cientifico.test.mjs  # límites del contenido científico (sin dependencias)
+node tests/en-vivo-util.test.mjs      # guion, vista y umbrales de la transmisión en vivo (sin dependencias)
 ```
 
 Reglas con el emulador de Firestore (batches y `serverTimestamp` reales; requiere Java 11+):
@@ -47,7 +48,7 @@ npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/
 
 (Si `firebase.json` no existe, el emulador usa los puertos por defecto; pasa `--config` o crea uno con `{"firestore":{"rules":"firestore.rules"}}`.)
 
-De extremo a extremo (navegador real + emuladores de Auth y Firestore, 59 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
+De extremo a extremo (navegador real + emuladores de Auth y Firestore, 73 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
 
 ## Desarrollo local
 
@@ -59,7 +60,7 @@ De extremo a extremo (navegador real + emuladores de Auth y Firestore, 59 casos 
 
 Cada participante es un **linfocito T virgen** que patrulla un ganglio linfático; una **célula dendrítica** llega del tejido infectado con antígeno y activa a uno, que prolifera. El libro no forma parte de la historia biológica. Guion de la historia completa (≈ 30 s): E0 elenco opcional (frotis de sangre, +5 s) · E1 inmunidad innata en el tejido (epitelio roto, macrófago residente, TLR, citocinas) · E2 neutrófilos (rodamiento, adhesión, diapédesis, fagocitosis, ROS, NET) · E3 la célula dendrítica captura, madura y viaja al ganglio · E4 el ganglio: encuentro con linfocitos T vírgenes · E5 sinapsis inmunológica con tres señales (TCR–MHC, CD28–CD80/86, citocinas) · E6 proliferación con IL-2 y final CD8 (perforina y granzimas) o CD4 (IFN-γ y macrófago activado). Las rondas siguientes arrancan en E4 (≈ 16 s). Los participantes no elegidos **no mueren ni desaparecen**; la proporción CD4:CD8 (2:1) es solo ilustrativa y **independiente del sorteo**; el azar es la regla del sorteo (todos tienen la misma probabilidad), no una afirmación sobre la biología.
 
-**Modos de la pantalla de sorteo:** por defecto, una animación resumida de ≈ 17 s (tarjeta de 3 s «Una infección activó a una célula dendrítica. Llega al ganglio linfático.» + escenas E4–E6) con subtítulos sencillos; el botón secundario **«Ver historia completa»** (o `sorteo.html?modo=completo`) usa la historia completa de ≈ 30 s con barra «minutos → horas → días» (y, en `?modo=completo`, la casilla del elenco). Las teclas siguen funcionando pero ya no se muestran.
+**Modos de la pantalla de sorteo:** por defecto, una animación resumida de ≈ 17 s (tarjeta de 3 s «Una infección activó a una célula dendrítica. Llega al ganglio linfático.» + escenas E4–E6) con subtítulos sencillos; el botón secundario **«Sortear con historia completa»** (o `sorteo.html?modo=completo`) usa la historia completa de ≈ 30 s con barra «minutos → horas → días» (y, en `?modo=completo`, la casilla del elenco). Las teclas siguen funcionando pero ya no se muestran.
 
 **Plan B:** `https://fungatec.github.io/sorteo_inmuno/sorteo.html?modo=clasico` abre la animación anterior (selección clonal de linfocitos B, ≈ 11 s). El guardado de la ronda ocurre **antes** de revelar en ambos modos.
 
@@ -75,3 +76,12 @@ Cada participante es un **linfocito T virgen** que patrulla un ganglio linfátic
 **Fuentes:** Abbas, A. K., Lichtman, A. H., & Pillai, S. (2022); Murphy, K., & Weaver, C. (2022), *Janeway's immunobiology* (10.ª ed.); Banchereau, J., & Steinman, R. M. (1998), *Nature* 392; Kolaczkowska, E., & Kubes, P. (2013), *Nat Rev Immunol* 13; Brinkmann, V. et al. (2004), *Science* 303; Rosenberg, H. F. et al. (2013); Voehringer, D. (2013); Jenkins, M. K., & Moon, J. J. (2012), *J Immunol* 188. Las referencias completas están en `FUENTES`.
 
 **Pruebas de la animación:** E2E con ronda real (3 participantes), 100 participantes (≈ 60 fps, revelación a ≈ 30 s), `prefers-reduced-motion` y modo clásico; auditoría axe sin violaciones (incluida la ficha).
+
+## Transmisión en vivo (`en-vivo.html`)
+
+Cualquiera con el enlace (`https://fungatec.github.io/sorteo_inmuno/en-vivo.html`) ve desde su celular el avance del sorteo y la **máscara** del ganador (por ejemplo, «Marta E. R. V. S.»), sin iniciar sesión. El enlace se copia con «Copiar enlace de transmisión» (panel y pantalla de sorteo) y se ofrece a los alumnos como «Ver el sorteo en vivo» al terminar el registro o si está cerrado.
+
+- **Qué se publica:** un único documento `publico/sorteo` (`espera` · `animando` con ronda, modo y tipo · `revelado` con la máscara). Nunca la clave ni el nombre completo, y la máscara solo desde el revelado. «Vaciar datos» lo deja en `espera`. El aviso de privacidad del registro lo dice.
+- **Solo sorteos reales:** el modo Ensayo y el modo clásico no publican nada (en el modo clásico los celulares se quedan en «Esperando el sorteo…»). Si la publicación falla, el sorteo del proyector no se ve afectado: solo aparece un aviso discreto.
+- **Costo en Firestore (plan Spark: 50 000 lecturas y 20 000 escrituras al día) de una ronda real con 50 espectadores**, medido en el emulador con 50 clientes independientes: **150 lecturas** en la primera ronda (50 de la conexión inicial + 50 por el cambio a «animando» + 50 por «revelado») y **100** en las siguientes (se cobra 1 lectura por documento entregado a cada oyente); **3 escrituras** del admin (1 en `sorteos` y 2 en `publico/sorteo`) más unas 4 lecturas de reglas (`exists` de admin y del ganador). Con 10 rondas serían ≈ 1 100 lecturas: lejos del límite. Un espectador cuya conexión estuvo cortada más de 30 minutos se vuelve a cobrar como una lectura inicial.
+- **Republicar reglas:** el Paso 6 cambia `firestore.rules` (bloque `match /publico/sorteo`); hay que republicarlas para que la transmisión funcione.

@@ -52,6 +52,8 @@ button.secundario { background: transparent; color: inherit; border: 2px solid c
 button.peligro { background: transparent; color: var(--error); border: 2px solid var(--error); min-height: 40px; padding: .35rem .9rem; }
 button.exito { background: var(--verde); }
 .formulario button[type="submit"] { width: 100%; margin-top: 1.5rem; }
+a.enlace-vivo { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: .75rem 1.4rem; border-radius: var(--radio); background: var(--cielo); color: var(--petroleo); font-weight: 600; text-decoration: none; }
+a.enlace-vivo:hover { filter: brightness(1.06); }
 .fila-botones { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
 
 /* Avisos */
@@ -267,3 +269,19 @@ button.ico { min-width: 40px; padding: .4rem; border-radius: 99px; font-family: 
 .ficha-fuentes { margin-top: 1rem; font-size: .8rem; }
 .ficha-fuentes li { margin-bottom: .3rem; }
 .proyeccion.ficha-abierta .fase, .proyeccion.ficha-abierta .barra-tiempo { visibility: hidden; }
+
+/* ---- Paso 6: transmisión en vivo (en-vivo.html), móvil primero ---- */
+.envivo-main { max-width: 40rem; margin: 0 auto; padding: .75rem 1rem 2rem; }
+.conexion { margin: 0 0 .75rem; padding: .5rem .9rem; border-radius: var(--radio); background: var(--alerta-fondo); color: var(--alerta); font-weight: 600; text-align: center; }
+.pantalla-ev { position: relative; border-radius: var(--radio); background: var(--petroleo); border: 1px solid rgba(167, 240, 243, .25); overflow: hidden; min-height: 26rem; }
+.pantalla-ev canvas { display: block; width: 100%; height: 22rem; }
+.pantalla-ev canvas[hidden] { display: none; }
+.textos-ev { padding: .75rem 1rem 1.25rem; text-align: center; }
+.textos-ev h1 { margin: 0 0 .5rem; font-size: clamp(1.3rem, 5vw, 1.8rem); color: var(--celeste); }
+.textos-ev p { margin: 0; min-height: 3.2em; font-size: clamp(1rem, 3.8vw, 1.25rem); line-height: 1.4; color: var(--celeste); }
+.revelado-ev { padding: 3rem 1rem; text-align: center; }
+.revelado-ev[hidden] { display: none; }
+.mascara-ev { margin: 0 0 .75rem; font-size: clamp(2.4rem, 13vw, 4.5rem); line-height: 1.1; font-weight: 700; color: var(--verde); overflow-wrap: anywhere; animation: aparecer .9s ease-out both; }
+.revelado-ev p { margin: 0; font-size: 1rem; font-weight: 600; color: var(--celeste); }
+.pie-ev { margin-top: 1rem; font-size: .8rem; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .mascara-ev { animation: none; } }

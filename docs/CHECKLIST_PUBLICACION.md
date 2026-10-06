@@ -43,16 +43,17 @@ Necesitas: un celular **con datos móviles** (no la Wi-Fi del evento), una lapto
 5. [ ] **Cerrar el registro** en el panel → recarga el celular: «El registro está cerrado».
 6. [ ] **Panel:** *Participantes* muestra el **nombre oficial**; si alguien tecleó distinto sale «escrito distinto»; la búsqueda encuentra sin acentos; *Alta manual* agrega a alguien aunque esté cerrado; *Eliminar* lo quita.
 7. [ ] **Sorteo (ensayo):** `sorteo.html` → marca *Ensayo* → *Iniciar la respuesta inmune*.
-   - [ ] La pantalla es mínima: contador, botón principal grande, «i», «Ver historia completa», «Pantalla completa» y «Ensayo» (sin pistas de teclas). La animación por defecto dura ≈ 17 s: tarjeta de 3 s («Una infección activó a una célula dendrítica…») + 3 escenas con subtítulos cortos, sin barra de tiempo. Las teclas siguen activas (**S** salta de escena, **C** subtítulos, **I** ficha). Sale una **máscara en formato título** (`Marta E. R. V. S.`), no el nombre completo.
+   - [ ] La pantalla es mínima: contador, botón principal grande, «i», «Sortear con historia completa», «Pantalla completa» y «Ensayo» (sin pistas de teclas). La animación por defecto dura ≈ 17 s: tarjeta de 3 s («Una infección activó a una célula dendrítica…») + 3 escenas con subtítulos cortos, sin barra de tiempo. Las teclas siguen activas (**S** salta de escena, **C** subtítulos, **I** ficha). Sale una **máscara en formato título** (`Marta E. R. V. S.`), no el nombre completo.
    - [ ] *Mostrar nombre completo* (o tecla **N**) muestra el nombre **oficial** de la lista en formato título (`Marta Elena Rios y Vega Soto`).
    - [ ] *Activar otro linfocito* (o **Espacio**) elige a otra persona con la misma animación de ≈ 17 s. El nombre sale grande y en verde, y debajo, pequeño, «Linfocito T CD8+ activado» (o CD4+).
-   - [ ] *Ver historia completa* (o abrir `sorteo.html?modo=completo`): ≈ 30 s con barra «minutos → horas → días»; en `?modo=completo` las rondas siguientes arrancan en E4 (~16 s) con «Una respuesta real es policlonal…».
+   - [ ] *Sortear con historia completa* (o abrir `sorteo.html?modo=completo`): ≈ 30 s con barra «minutos → horas → días»; en `?modo=completo` las rondas siguientes arrancan en E4 (~16 s) con «Una respuesta real es policlonal…».
    - [ ] **Plan B:** abre `sorteo.html?modo=clasico` y comprueba que la animación anterior (≈ 11 s, «Liberar el antígeno» / «Volver a sortear») funciona. Úsala si el proyector o el equipo no mueven bien la animación nueva.
    - [ ] **Pantalla completa** (tecla **F**) en la laptop y, si hay, en el proyector: se ve nítido, los botones se ocultan a los 3 s y reaparecen al mover el ratón.
-8. [ ] **Sorteo real de prueba:** desmarca *Ensayo*, sortea una vez → en Firestore aparece `sorteos/…` con `fecha`, `totalParticipantes`, `ganadorClave`, `ronda`, `adminUid`.
-9. [ ] **Descargar registro del sorteo** (Panel, «Al terminar el evento») → abre el `.txt`: fecha, ronda, total y ganador con nombre oficial.
-10. [ ] **Vaciar datos:** escribe `BORRAR`. En Firestore verifica que `lista`, `participantes`, `correos` y `sorteos` quedaron **vacías**, que `config/estado` sigue existiendo (en `false`) y que `admins` está intacto.
-11. [ ] **Cierre de sesión:** *Salir*; abrir `panel.html` directo te manda al login.
+8. [ ] **Transmisión en vivo:** con las reglas republicadas, abre `en-vivo.html` en el celular (o usa «Copiar enlace de transmisión»): dice «Esperando el sorteo…». Con *Ensayo* marcado no cambia nada. Con un sorteo real: sale la narrativa durante la animación y, al revelar el proyector, la máscara en verde. Tras *Vaciar datos* vuelve a «Esperando el sorteo…» (sin máscara).
+9. [ ] **Sorteo real de prueba:** desmarca *Ensayo*, sortea una vez → en Firestore aparece `sorteos/…` con `fecha`, `totalParticipantes`, `ganadorClave`, `ronda`, `adminUid`.
+10. [ ] **Descargar registro del sorteo** (Panel, «Al terminar el evento») → abre el `.txt`: fecha, ronda, total y ganador con nombre oficial.
+11. [ ] **Vaciar datos:** escribe `BORRAR`. En Firestore verifica que `lista`, `participantes`, `correos` y `sorteos` quedaron **vacías**, que `config/estado` sigue existiendo (en `false`) y que `admins` está intacto.
+12. [ ] **Cierre de sesión:** *Salir*; abrir `panel.html` directo te manda al login.
 
 ## D · Día del evento (resumen; el detalle está en el informe)
 

@@ -1,15 +1,18 @@
 // Pantalla del sorteo / modo proyección. Tres variantes de animación:
 //  - por defecto («resumido», ≈ 18 s): tarjeta de 3 s («Una infección activó a una célula dendrítica…») y las escenas E4–E6
-//    de la respuesta inmune (js/escena-inmune.js). El botón «Ver historia completa» lanza la ronda con E1–E6 (≈ 30 s);
+//    de la respuesta inmune (js/escena-inmune.js). El botón «Sortear con historia completa» lanza la ronda con E1–E6 (≈ 30 s);
 //  - ?modo=completo: la historia completa E0–E6 como animación por defecto (con barra «minutos → horas → días» y elenco);
 //  - ?modo=clasico (plan B del evento): la animación anterior de selección clonal, intacta (js/escena.js).
 // Reglas de oro (ver CLAUDE.md), idénticas en ambos modos:
 //  - el ganador sale de crypto.getRandomValues con muestreo por rechazo (js/azar.js), nunca Math.random;
 //  - se elige y se GUARDA antes de animar: si no se pudo guardar, no se revela a nadie;
-//  - en pantalla solo aparece el nombre OFICIAL (lista/{clave}.nombre), abreviado; nunca el tecleado.
+//  - en pantalla solo aparece el nombre OFICIAL (lista/{clave}.nombre), abreviado; nunca el tecleado;
+//  - transmisión en vivo (Paso 6, ADITIVA): solo en sorteos reales y SOLO después de guardar la ronda se publica «animando»
+//    (sin ganador) y, en el instante del revelado, «revelado» con la máscara. Es best-effort: nunca se espera, nunca
+//    bloquea ni retrasa el guardado ni el revelado, y si falla solo se avisa. No se publica en el modo clásico.
 import { configPendiente } from "./firebase.js";
 import { requerirAdmin, cerrarSesion } from "./auth.js";
-import { leerColeccion, guardarSorteo } from "./datos.js";
+import { leerColeccion, guardarSorteo, publicarAnimando, publicarRevelado } from "./datos.js";
 import { enteroAleatorio } from "./azar.js";
 import { crearEscena, FRASES } from "./escena.js";
 import { crearEscenaInmune } from "./escena-inmune.js";
@@ -17,7 +20,8 @@ import { TARJETA } from "./contenido-cientifico.js";
 import { crearFicha } from "./ficha.js";
 import { enmascararNombre, formatoTitulo } from "./sorteo-util.js";
 import { mensajeErrorGuardado } from "./errores-guardado.js";
-import { $, h, aviso, avisoConfigPendiente } from "./ui.js";
+import { $, h, aviso, avisoConfigPendiente, copiarTexto } from "./ui.js";
+import { urlTransmision } from "./en-vivo-util.js";
 
 const msg = $("#aviso"), proyeccion = $("#proyeccion"), boton = $("#sortear"), btnNombre = $("#nombre-completo");
 const btnPantalla = $("#pantalla-completa"), ensayoChk = $("#ensayo"), elencoChk = $("#elenco");
@@ -52,7 +56,27 @@ const movimientoReducido = matchMedia("(prefers-reduced-motion: reduce)");
 escena.setReducido(movimientoReducido.matches);
 movimientoReducido.addEventListener("change", (e) => escena.setReducido(e.matches));
 escena.alFase((texto, clave) => { $("#fase").textContent = texto; proyeccion.classList.toggle("tarjeta-intro", clave === "INTRO"); });
-escena.alRevelar((info) => { if (actual && info?.tipo) actual.tipo = info.tipo; mostrarResultado(); });
+escena.alRevelar((info) => {
+  if (actual && info?.tipo) actual.tipo = info.tipo;
+  mostrarResultado();
+  // Mismo instante que el revelado del proyector. Solo la máscara (nunca la clave ni el nombre completo).
+  if (actual?.transmitir) { const { ronda, modo, tipo, mascara: ganadorMascara } = actual; transmitir(() => publicarRevelado({ ronda, modo, tipo, ganadorMascara })); }
+});
+
+// ---- transmisión en vivo (best-effort): cola serie para que «revelado» nunca se adelante a «animando»
+const estadoEnVivo = $("#envivo-estado");
+let colaEnVivo = Promise.resolve();
+function transmitir(escribir) {
+  colaEnVivo = colaEnVivo.then(escribir).catch((err) => {
+    console.error("[en vivo] no se pudo publicar:", err?.code ?? err?.name ?? "desconocido");     // solo el código
+    estadoEnVivo.textContent = "Transmisión en vivo: no se pudo publicar esta ronda (el sorteo en pantalla no se vio afectado). Revisa que firestore.rules esté republicada.";
+    estadoEnVivo.hidden = false;
+  });
+}
+$("#copiar-enlace").addEventListener("click", async () => {
+  const url = urlTransmision(location.href);
+  aviso(msg, (await copiarTexto(url)) ? `Enlace de la transmisión copiado: ${url}` : `No se pudo copiar automáticamente. El enlace de la transmisión es: ${url}`, "exito");
+});
 // Barra de tiempo («minutos → horas → días»): solo en el modo inmune, mientras dura la animación.
 const barra = $("#barra-tiempo");
 escena.alProgreso?.((v) => { barra.style.setProperty("--avance", `${(v * 100).toFixed(1)}%`); });
@@ -122,7 +146,7 @@ btnNombre.addEventListener("click", () => {
 ensayoChk.addEventListener("change", () => { if (ocupado) { ensayoChk.checked = !ensayoChk.checked; return; } ensayoGanadores.clear(); narrativaMostrada = false; preparar(); });
 
 // ------------------------------------------------------------------ sorteo
-async function sortear({ completa = false } = {}) {   // completa: botón «Ver historia completa» (E1–E6) en el modo por defecto
+async function sortear({ completa = false } = {}) {   // completa: botón «Sortear con historia completa» (E1–E6) en el modo por defecto
   if (ocupado || boton.disabled) return;
   ocupado = true; fijarBoton(true); btnNombre.hidden = true; aviso(msg, "");
   btnNombre.setAttribute("aria-pressed", "false"); btnNombre.textContent = "Mostrar nombre completo";
@@ -159,6 +183,12 @@ async function sortear({ completa = false } = {}) {   // completa: botón «Ver 
   barra.hidden = !larga; if (larga) barra.style.setProperty("--avance", "0%");
   const iv = escena.indiceVisual(indice, pool.length, enteroAleatorio);
   actual.tipo = escena.tipoDe?.(iv);
+  estadoEnVivo.hidden = true;
+  // Transmisión: solo sorteos REALES (ya guardados arriba) y fuera del modo clásico. Sin await: no bloquea nada.
+  if (!ensayo && !CLASICO) {
+    actual.transmitir = true; actual.ronda = ronda; actual.modo = larga ? "completo" : "resumido";
+    const { modo, tipo } = actual; transmitir(() => publicarAnimando({ ronda, modo, tipo }));
+  }
   await escena.reproducir(iv, CLASICO ? undefined : { desdeE4, incluirE0: COMPLETO && elencoChk.checked, resumido: !larga });
   narrativaMostrada = true;
 

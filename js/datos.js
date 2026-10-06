@@ -79,6 +79,18 @@ export async function guardarSorteo({ totalParticipantes, ganadorClave, ronda })
   return ref.id;
 }
 
+/**
+ * Transmisión en vivo: documento único publico/sorteo (ver firestore.rules y js/en-vivo-util.js). Solo sorteos reales.
+ * Se escribe con una transacción (como guardarSorteo) para que, sin conexión, falle en vez de encolarse y aplicarse
+ * minutos después con un estado ya obsoleto. NUNCA se escribe el ganador (clave, nombre ni máscara) antes del revelado.
+ */
+const refPublico = () => doc(db, "publico", "sorteo");
+const escribirPublico = (datos) => runTransaction(db, async (tx) => { tx.set(refPublico(), datos); }, { maxAttempts: 1 });
+export const publicarEspera = () => escribirPublico({ estado: "espera" });
+export const publicarAnimando = ({ ronda, modo, tipo }) => escribirPublico({ estado: "animando", ronda, modo, tipo, inicio: serverTimestamp() });
+export const publicarRevelado = ({ ronda, modo, tipo, ganadorMascara }) =>
+  escribirPublico({ estado: "revelado", ronda, modo, tipo, inicio: serverTimestamp(), ganadorMascara });
+
 /** Borra TODOS los documentos de una colección en lotes de 400. Devuelve cuántos borró. */
 async function borrarColeccion(nombre) {
   const docs = (await getDocs(collection(db, nombre))).docs;
@@ -98,6 +110,10 @@ async function borrarColeccion(nombre) {
 export async function vaciarDatos() {
   await fijarRegistroAbierto(false);
   const borrados = {};
+  // La máscara del último ganador es visible para quien tenga el enlace de la transmisión: se limpia primero. Si falla
+  // (p. ej. reglas sin republicar) no se detiene el vaciado: se avisa en el resultado para que la admin lo resuelva.
+  try { await publicarEspera(); borrados.transmisionLimpia = true; }
+  catch (err) { console.error("[vaciar] no se pudo limpiar publico/sorteo:", err?.code ?? err?.name ?? "desconocido"); borrados.transmisionLimpia = false; }
   for (const col of ["participantes", "correos", "sorteos", "lista"]) borrados[col] = await borrarColeccion(col);
   return borrados;
 }

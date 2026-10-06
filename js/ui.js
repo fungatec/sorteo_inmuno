@@ -55,3 +55,14 @@ export function validarEnVivo(input, validador) {
   input.addEventListener("input", () => { if (tocado) pintar(); });
   return { validar: () => { tocado = true; return pintar(); }, reiniciar: () => { tocado = false; pintar(); } };
 }
+
+/** Copia texto al portapapeles (con alternativa para navegadores sin la API o sin HTTPS). Devuelve true si se copió. */
+export async function copiarTexto(texto) {
+  try { await navigator.clipboard.writeText(texto); return true; } catch { /* se prueba la alternativa */ }
+  try {
+    const t = document.createElement("textarea");
+    t.value = texto; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.append(t); t.select();
+    const ok = document.execCommand("copy"); t.remove(); return ok;
+  } catch { return false; }
+}

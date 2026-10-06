@@ -9,7 +9,8 @@ import {
   analizarLista, claveDeNombre, compararConOficial, mensajeErrorNombre, mensajeErrorCorreo, normalizarCorreo,
 } from "./normalizar.js";
 import { textoRegistroSorteo, nombreArchivoRegistro, enmascararNombre } from "./sorteo-util.js";
-import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo } from "./ui.js";
+import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo, copiarTexto } from "./ui.js";
+import { urlTransmision } from "./en-vivo-util.js";
 
 const msg = $("#aviso");
 let lista = [], participantes = [], registroAbierto = null, vistaPrevia = null;
@@ -46,6 +47,11 @@ function pintarEstado() {
     : registroAbierto === false ? "Registro cerrado" : "Estado no disponible (¿existe config/estado?)";
 }
 
+$("#copiar-enlace").addEventListener("click", async () => {
+  const url = urlTransmision(location.href);
+  if (await copiarTexto(url)) aviso(msg, `Enlace de la transmisión copiado: ${url}`, "exito");
+  else aviso(msg, `No se pudo copiar automáticamente. El enlace de la transmisión es: ${url}`, "aviso");
+});
 $("#alternar").addEventListener("click", async () => {
   const objetivo = registroAbierto !== true;
   if (!objetivo && !confirm("¿Cerrar el registro? Nadie más podrá inscribirse.")) return;
@@ -248,7 +254,9 @@ $("#form-vaciar").addEventListener("submit", async (e) => {
   try {
     const n = await vaciarDatos();
     dlg.close();
-    aviso(msg, `Datos eliminados: ${n.lista} de la lista, ${n.participantes} participantes, ${n.correos} correos y ${n.sorteos} sorteos. El registro quedó cerrado.`, "exito");
+    const resumen = `Datos eliminados: ${n.lista} de la lista, ${n.participantes} participantes, ${n.correos} correos y ${n.sorteos} sorteos. El registro quedó cerrado.`;
+    if (n.transmisionLimpia) aviso(msg, `${resumen} La transmisión en vivo quedó en espera.`, "exito");
+    else aviso(msg, `${resumen} ATENCIÓN: no se pudo limpiar la transmisión en vivo (publico/sorteo): puede seguir mostrando la máscara del último ganador. Republica firestore.rules, o bórrala en la consola de Firebase.`, "error");
   } catch {
     dlg.close();
     aviso(msg, "El vaciado no terminó. Revisa tu conexión y vuelve a intentarlo; el registro quedó cerrado.", "error");

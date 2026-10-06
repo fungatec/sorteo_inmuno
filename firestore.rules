@@ -183,6 +183,45 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/participantes/$(request.resource.data.ganadorClave));
     }
 
+    // ----------------------------------------------------------------- publico
+    // Transmisión en vivo (en-vivo.html): documento ÚNICO publico/sorteo. Cualquiera con el enlace puede LEERLO (`get`,
+    // sin `list`); solo el admin lo escribe. Contiene SOLO lo que ya es público en la proyección:
+    //   espera    -> { estado }                                        (también tras «Vaciar datos»)
+    //   animando  -> { estado, ronda, modo, tipo, inicio }             (sin ganador: ni clave, ni nombre, ni máscara)
+    //   revelado  -> { estado, ronda, modo, tipo, inicio, ganadorMascara }   (máscara «Nombre I. I.», sin clave)
+    // `inicio` = request.time (en «revelado» es el momento del revelado). `tipo` (CD4/CD8) es ilustrativo y
+    // no identifica a nadie. La máscara se valida como el nombre (sin < > & ni comillas), 1-60 caracteres.
+    function mascaraPublicaValida(m) {
+      return m is string
+        && m.size() >= 1 && m.size() <= 60
+        && !m.matches('.*[<>&"].*')
+        && !m.matches(".*['`].*")
+        && !m.matches('.*[\u201C\u201D\u2018\u2019].*');
+    }
+    function publicoSorteoValido() {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['estado', 'ronda', 'modo', 'tipo', 'inicio', 'ganadorMascara'])
+        && d.keys().hasAll(['estado'])
+        && d.estado is string
+        && (
+          d.estado == 'espera' && d.keys().hasOnly(['estado'])
+          || (d.estado == 'animando' || d.estado == 'revelado')
+             && d.keys().hasAll(['estado', 'ronda', 'modo', 'tipo', 'inicio'])
+             && d.ronda is int && d.ronda >= 1
+             && d.modo in ['resumido', 'completo']
+             && d.tipo in ['CD4', 'CD8']
+             && d.inicio == request.time
+             && (d.estado == 'animando'
+                   ? d.keys().hasOnly(['estado', 'ronda', 'modo', 'tipo', 'inicio'])
+                   : d.keys().hasAll(['ganadorMascara']) && mascaraPublicaValida(d.ganadorMascara))
+        );
+    }
+    match /publico/sorteo {
+      allow get: if true;
+      allow create, update: if esAdmin() && publicoSorteoValido();
+      allow delete: if esAdmin();
+    }
+
     // -------------------------------------------------------- denegar el resto
     match /{document=**} {
       allow read, write: if false;

@@ -168,6 +168,11 @@ async function subtitulos(pg, ms = 60000) {
     await p3.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro cerrado");
     assert.equal(await p3.isVisible("#registro"), false); assert.match(await p3.textContent("#cerrado"), /El registro está cerrado/);
   });
+  await prueba("PASO 6 · registro: «Ver el sorteo en vivo» en la tarjeta de registro cerrado y en la confirmación; el aviso de privacidad menciona la máscara", async () => {
+    assert.equal(await p3.getAttribute("#cerrado a.enlace-vivo", "href"), "en-vivo.html"); assert.equal(await p3.isVisible("#cerrado a.enlace-vivo"), true);
+    assert.equal(await p2.getAttribute("#listo a.enlace-vivo", "href"), "en-vivo.html"); assert.equal(await p2.isVisible("#listo a.enlace-vivo"), true);
+    assert.match(await p3.textContent(".privacidad"), /solo para este sorteo y se eliminarán al terminar el evento\. La transmisión en vivo muestra, a quien tenga el enlace, la máscara del nombre del ganador/);
+  });
   await sembrar("config/estado", { registroAbierto: true });
   for (const pg of [p, p2, p3]) assert.deepEqual(pg.errores, [], "errores JS: " + pg.errores);
 }
@@ -462,7 +467,7 @@ async function subtitulos(pg, ms = 60000) {
   for (const d of await listar("sorteos")) await fetch(`http://127.0.0.1:8080/v1/${d.name}`, { method: "DELETE", headers: OWNER });
   const a = await p.context().newPage(); a.errores = []; a.on("pageerror", (e) => a.errores.push(e.message));
   await a.goto(`${BASE}/sorteo.html?emulador&modo=completo`); await a.waitForFunction(() => document.querySelector("#contador").textContent === "3");
-  await prueba("?modo=completo: pantalla con elenco y sin «Ver historia completa»", async () => {
+  await prueba("?modo=completo: pantalla con elenco y sin «Sortear con historia completa»", async () => {
     assert.equal(await a.isVisible("#etq-elenco"), true); assert.equal(await a.isHidden("#historia-completa"), true);
     assert.equal(await a.evaluate(() => document.querySelector("#proyeccion").classList.contains("completo")), true);
   });
@@ -529,7 +534,7 @@ async function subtitulos(pg, ms = 60000) {
     const visibles = await q.evaluate(() => [...document.querySelectorAll("#proyeccion button")].filter((b) => !b.hidden && b.offsetParent).map((b) => b.id));
     assert.deepEqual(visibles.sort(), ["btn-ficha", "historia-completa", "pantalla-completa", "sortear"]);
     assert.equal(await q.textContent("#btn-ficha"), "i"); assert.equal(await q.getAttribute("#btn-ficha", "aria-label"), "Ficha inmunológica");
-    assert.equal(await q.textContent("#historia-completa"), "Ver historia completa");
+    assert.equal(await q.textContent("#historia-completa"), "Sortear con historia completa");
     const alto = (id) => q.evaluate((i) => document.querySelector(i).getBoundingClientRect().height, id);
     assert.ok(await alto("#sortear") >= 60 && await alto("#sortear") > await alto("#pantalla-completa") * 1.4, "el botón principal es el más grande");
     assert.equal(await q.locator("kbd, #atajos").count(), 0, "sin pistas de teclas");
@@ -563,7 +568,7 @@ async function subtitulos(pg, ms = 60000) {
     console.log(`   [info] animación por defecto: revelado a los ${seg.toFixed(1)} s`);
     assert.deepEqual(q.errores, []); await q.close();
   });
-  await prueba("PASO 5 · «Ver historia completa»: lanza la ronda con E1–E6 y la barra «minutos → horas → días»; la ronda siguiente vuelve a la animación resumida", async () => {
+  await prueba("PASO 5 · «Sortear con historia completa»: lanza la ronda con E1–E6 y la barra «minutos → horas → días»; la ronda siguiente vuelve a la animación resumida", async () => {
     const q = await nuevaSorteo("");
     await q.check("#ensayo"); await q.click("#historia-completa");
     const t0 = Date.now(), vistos = []; let barra = false;
@@ -636,6 +641,165 @@ async function subtitulos(pg, ms = 60000) {
     await fetch(`http://127.0.0.1:8080/v1/${d.name}`, { method: "DELETE", headers: OWNER });
     assert.deepEqual(q.errores, []); await q.close();
   });
+  // ---------------- PASO 6: transmisión en vivo (dos contextos de navegador: admin y espectador sin sesión)
+  const REGLAS_SIN_PUBLICO = REGLAS.replace("allow create, update: if esAdmin() && publicoSorteoValido();", "allow create, update: if false;");
+  assert.notEqual(REGLAS_SIN_PUBLICO, REGLAS);
+  const ganadorDeUltimoSorteo = async () => { const d = (await listar("sorteos")).at(-1); return d?.fields.ganadorClave.stringValue; };
+  const limpiarSorteos = async () => { for (const d of await listar("sorteos")) await fetch(`http://127.0.0.1:8080/v1/${d.name}`, { method: "DELETE", headers: OWNER }); };
+  await prueba("PASO 6 · panel y sorteo: «Copiar enlace de transmisión» (el enlace es en-vivo.html del mismo sitio)", async () => {
+    const q = await nuevaSorteo("");
+    await q.click("#copiar-enlace");
+    await q.waitForFunction(() => /Enlace de la transmisión copiado|El enlace de la transmisión es/.test(document.querySelector("#aviso").textContent));
+    assert.ok((await q.textContent("#aviso")).includes(`${BASE}/en-vivo.html`), await q.textContent("#aviso"));
+    const w = await p.context().newPage(); await w.goto(`${BASE}/panel.html?emulador`); await w.waitForSelector("#contenido:not([hidden])");
+    await w.click("#copiar-enlace");
+    await w.waitForFunction(() => /transmisión/.test(document.querySelector("#aviso").textContent));
+    assert.ok((await w.textContent("#aviso")).includes(`${BASE}/en-vivo.html`));
+    await w.close(); await q.close();
+  });
+  await prueba("PASO 6 · espectador: «Esperando el sorteo…» sin documento; ronda real: no ve al ganador antes del revelado y sí después; la máscara es lo único que se publica", async () => {
+    await borrar("publico/sorteo"); await limpiarSorteos();
+    const v = await nuevaPagina(); await v.goto(`${BASE}/en-vivo.html?emulador`);
+    await v.waitForFunction(() => document.querySelector("#titulo-ev").textContent === "Esperando el sorteo…");
+    assert.equal(await v.getAttribute(".textos-ev", "aria-live"), "polite");
+    const q = await nuevaSorteo("", false);                        // admin, ronda REAL (sin «Ensayo»), movimiento normal
+    assert.equal(await q.isChecked("#ensayo"), false);
+    await q.click("#sortear");
+    const docs = [], vistas = []; let t0 = Date.now();
+    while (await q.isHidden("#resultado") && Date.now() - t0 < 30000) {
+      const d = await leer("publico/sorteo"); if (d) docs.push(JSON.stringify(d.fields));
+      vistas.push(await v.evaluate(() => document.body.innerText + "|" + document.querySelector("#revelado-ev").hidden)); await q.waitForTimeout(250);
+    }
+    const mascara = await q.textContent("#ganador"), clave = await ganadorDeUltimoSorteo();
+    assert.ok(MASCARAS.includes(mascara), mascara);
+    assert.ok(docs.length > 5 && docs.some((d) => d.includes("animando")), "se publicó «animando» durante la animación");
+    for (const d of docs) { assert.ok(!d.includes(mascara) && !d.includes(clave) && !/ganador|revelado/.test(d), "antes del revelado el documento no contiene al ganador: " + d); }
+    for (const t of vistas) { assert.ok(!t.includes(mascara), "el espectador no ve al ganador antes del revelado"); assert.ok(t.endsWith("|true"), "el panel de revelado sigue oculto"); }
+    assert.ok(vistas.some((t) => t.includes("Ronda 1") && t.includes(SUBTITULOS.INTRO)), "el espectador vio la narrativa de la ronda");
+    // después del revelado el espectador sí lo ve (máscara en grande, tipo debajo y la ronda)
+    await v.waitForFunction((m) => document.querySelector("#mascara-ev").textContent === m, mascara, { timeout: 5000 });
+    assert.match(await v.textContent("#tipo-ev"), /^Linfocito T CD[48]\+ activado$/); assert.equal(await v.textContent("#titulo-ev"), "Ronda 1");
+    assert.equal(await v.evaluate(() => getComputedStyle(document.querySelector("#mascara-ev")).color), "rgb(69, 172, 77)");
+    const f = (await leer("publico/sorteo")).fields;
+    assert.deepEqual(Object.keys(f).sort(), ["estado", "ganadorMascara", "inicio", "modo", "ronda", "tipo"]);
+    assert.equal(f.estado.stringValue, "revelado"); assert.equal(f.ganadorMascara.stringValue, mascara); assert.equal(f.modo.stringValue, "resumido");
+    assert.ok(!JSON.stringify(f).includes(clave), "la clave nunca se publica");
+    assert.deepEqual(v.errores, []); await v.close(); await q.close();
+    await limpiarSorteos();
+  });
+  await prueba("PASO 6 · «Sortear con historia completa» publica modo «completo»; Ensayo no publica nada y el espectador no ve ningún cambio", async () => {
+    await borrar("publico/sorteo");
+    const q = await nuevaSorteo("");                               // movimiento reducido + tecla S para ir rápido
+    await q.click("#historia-completa"); await acelerar(q);
+    await q.waitForFunction(() => !document.querySelector("#sortear").disabled);
+    await q.waitForTimeout(800);
+    const antes = JSON.stringify(await leer("publico/sorteo"));
+    assert.equal((await leer("publico/sorteo")).fields.modo.stringValue, "completo");
+    const v = await nuevaPagina(); await v.goto(`${BASE}/en-vivo.html?emulador`);
+    await v.waitForFunction(() => !document.querySelector("#revelado-ev").hidden);
+    const textoAntes = await v.evaluate(() => document.body.innerText);
+    await limpiarSorteos();
+    await q.reload(); await q.waitForFunction(() => document.querySelector("#contador").textContent === "3");
+    await q.check("#ensayo"); await q.click("#sortear"); await acelerar(q);
+    await q.waitForFunction(() => !document.querySelector("#sortear").disabled); await q.waitForTimeout(1500);
+    assert.equal(JSON.stringify(await leer("publico/sorteo")), antes, "con Ensayo el documento público no cambia");
+    assert.equal(await v.evaluate(() => document.body.innerText), textoAntes, "el espectador no ve nada nuevo");
+    assert.equal((await listar("sorteos")).length, 0);
+    await v.close(); await q.close();
+  });
+  await prueba("PASO 6 · modo clásico: no publica nada (no cambia el documento público)", async () => {
+    const antes = JSON.stringify(await leer("publico/sorteo"));
+    const q = await nuevaSorteo("&modo=clasico", false);
+    await q.click("#sortear"); await q.waitForSelector("#resultado:not([hidden])", { timeout: 25000 }); await q.waitForTimeout(1000);
+    assert.equal(JSON.stringify(await leer("publico/sorteo")), antes);
+    await limpiarSorteos(); await q.close();
+  });
+  await prueba("PASO 6 · publicación best-effort: con reglas sin permiso para publico/sorteo el sorteo se guarda y se revela igual; aviso discreto y console.error", async () => {
+    await ponerReglas(REGLAS_SIN_PUBLICO); await new Promise((x) => setTimeout(x, 800));
+    try {
+    const q = await nuevaSorteo(""); const consola = []; q.on("console", (m) => { if (m.type() === "error") consola.push(m.text()); });
+    await q.click("#sortear"); await acelerar(q);
+    await q.waitForSelector("#resultado:not([hidden])"); assert.ok(MASCARAS.includes(await q.textContent("#ganador")));
+    assert.equal((await listar("sorteos")).length, 1, "la ronda se guardó");
+    await q.waitForFunction(() => !document.querySelector("#envivo-estado").hidden);
+    assert.match(await q.textContent("#envivo-estado"), /Transmisión en vivo: no se pudo publicar/);
+    assert.ok(consola.some((c) => c.includes("[en vivo] no se pudo publicar: permission-denied")), consola.join(" | "));
+    await q.waitForFunction(() => !document.querySelector("#sortear").disabled);       // se puede seguir sorteando
+    await q.close();
+    } finally { await ponerReglas(REGLAS); await new Promise((x) => setTimeout(x, 800)); await limpiarSorteos(); }
+  });
+  await prueba("PASO 6 · espectador que llega tarde: «El sorteo está en curso…»; tras 90 s sin revelado: «El sorteo se interrumpió; espera la siguiente ronda.»", async () => {
+    const hace = (ms) => new Date(Date.now() - ms);
+    await fetch(`${FS}/publico/sorteo`, { method: "PATCH", headers: OWNER, body: JSON.stringify({ fields: { estado: { stringValue: "animando" }, ronda: { integerValue: "2" },
+      modo: { stringValue: "resumido" }, tipo: { stringValue: "CD8" }, inicio: { timestampValue: hace(10000).toISOString() } } }) });
+    const v = await nuevaPagina(); await v.goto(`${BASE}/en-vivo.html?emulador`);
+    await v.waitForFunction(() => document.querySelector("#titulo-ev").textContent === "El sorteo está en curso…");
+    await v.close();
+    await fetch(`${FS}/publico/sorteo`, { method: "PATCH", headers: OWNER, body: JSON.stringify({ fields: { estado: { stringValue: "animando" }, ronda: { integerValue: "2" },
+      modo: { stringValue: "resumido" }, tipo: { stringValue: "CD8" }, inicio: { timestampValue: hace(120000).toISOString() } } }) });
+    const w = await nuevaPagina(); await w.goto(`${BASE}/en-vivo.html?emulador`);
+    await w.waitForFunction(() => document.querySelector("#titulo-ev").textContent === "El sorteo se interrumpió; espera la siguiente ronda.");
+    // espectador presente cuando empieza «animando»: temporizador de 90 s (reloj simulado)
+    await w.clock.install(); await w.reload();
+    await fetch(`${FS}/publico/sorteo`, { method: "PATCH", headers: OWNER, body: JSON.stringify({ fields: { estado: { stringValue: "espera" } } }) });
+    await w.waitForFunction(() => document.querySelector("#titulo-ev").textContent === "Esperando el sorteo…");
+    await fetch(`${FS}/publico/sorteo`, { method: "PATCH", headers: OWNER, body: JSON.stringify({ fields: { estado: { stringValue: "animando" }, ronda: { integerValue: "3" },
+      modo: { stringValue: "resumido" }, tipo: { stringValue: "CD4" }, inicio: { timestampValue: new Date().toISOString() } } }) });
+    await w.waitForFunction(() => document.querySelector("#titulo-ev").textContent === "Ronda 3");
+    await w.clock.fastForward(91000);
+    await w.waitForFunction(() => document.querySelector("#titulo-ev").textContent === "El sorteo se interrumpió; espera la siguiente ronda.");
+    await w.close();
+  });
+  await prueba("PASO 6 · espectador: sin conexión muestra aviso y al reconectar recibe el estado más reciente", async () => {
+    await fetch(`${FS}/publico/sorteo`, { method: "PATCH", headers: OWNER, body: JSON.stringify({ fields: { estado: { stringValue: "espera" } } }) });
+    const v = await nuevaPagina(); await v.goto(`${BASE}/en-vivo.html?emulador`);
+    await v.waitForFunction(() => document.querySelector("#titulo-ev").textContent === "Esperando el sorteo…");
+    await v.waitForTimeout(1000);
+    await v.context().setOffline(true);
+    await v.waitForFunction(() => !document.querySelector("#conexion").hidden && /Sin conexión/.test(document.querySelector("#conexion").textContent));
+    assert.equal(await v.getAttribute("#conexion", "role"), "status");
+    await fetch(`${FS}/publico/sorteo`, { method: "PATCH", headers: OWNER, body: JSON.stringify({ fields: { estado: { stringValue: "revelado" }, ronda: { integerValue: "4" },
+      modo: { stringValue: "resumido" }, tipo: { stringValue: "CD8" }, inicio: { timestampValue: new Date().toISOString() }, ganadorMascara: { stringValue: "Ana L." } } }) });
+    await v.context().setOffline(false);
+    await v.waitForFunction(() => document.querySelector("#mascara-ev").textContent === "Ana L." && document.querySelector("#conexion").hidden, null, { timeout: 40000 });
+    assert.equal(await v.textContent("#titulo-ev"), "Ronda 4");
+    await v.close();
+  });
+  await prueba("PASO 6 · la máscara llega como TEXTO (nunca HTML) a la pantalla del espectador", async () => {
+    await fetch(`${FS}/publico/sorteo`, { method: "PATCH", headers: OWNER, body: JSON.stringify({ fields: { estado: { stringValue: "revelado" }, ronda: { integerValue: "5" },
+      modo: { stringValue: "resumido" }, tipo: { stringValue: "CD4" }, inicio: { timestampValue: new Date().toISOString() }, ganadorMascara: { stringValue: "<img src=x onerror=alert(1)>" } } }) });
+    const v = await nuevaPagina(); const dialogos = []; v.on("dialog", (d) => { dialogos.push(d.message()); d.dismiss(); });
+    await v.goto(`${BASE}/en-vivo.html?emulador`);
+    await v.waitForFunction(() => document.querySelector("#mascara-ev").textContent.startsWith("<img"));
+    await v.waitForTimeout(400);
+    assert.equal(await v.locator("main img").count(), 0); assert.deepEqual(dialogos, []); await v.close();
+  });
+  await prueba("PASO 6 · 50 espectadores: lecturas y escrituras de una ronda real (clientes independientes con el SDK de Node)", async () => {
+    const { initializeApp, deleteApp } = await import("firebase/app");
+    const { getFirestore, connectFirestoreEmulator, doc, onSnapshot, terminate } = await import("firebase/firestore");
+    await fetch(`${FS}/publico/sorteo`, { method: "PATCH", headers: OWNER, body: JSON.stringify({ fields: { estado: { stringValue: "espera" } } }) });
+    const N = 50, lecturas = new Array(N).fill(0), previo = new Array(N).fill(null), apps = [], bajas = [];
+    for (let i = 0; i < N; i++) {
+      const app = initializeApp({ projectId: "sorteoinmuno", apiKey: "fake-key" }, `espectador${i}`); apps.push(app);
+      const db = getFirestore(app); connectFirestoreEmulator(db, "127.0.0.1", 8080);
+      bajas.push(onSnapshot(doc(db, "publico", "sorteo"), { includeMetadataChanges: true }, (snap) => {
+        if (snap.metadata.fromCache) return;                                // lo que viene del servidor es lo que se factura
+        const huella = JSON.stringify(snap.exists() ? snap.data() : null);
+        if (huella !== previo[i]) { previo[i] = huella; lecturas[i]++; }     // cada documento entregado por el servidor = 1 lectura
+      }));
+    }
+    for (let k = 0; k < 100 && lecturas.some((x) => x === 0); k++) await new Promise((x) => setTimeout(x, 100));
+    assert.ok(lecturas.every((x) => x === 1), "lectura inicial: 1 por espectador");
+    const q = await nuevaSorteo("", false);                          // ronda real con animación completa (~17 s)
+    await q.click("#sortear");
+    await q.waitForSelector("#resultado:not([hidden])", { timeout: 30000 }); await q.waitForTimeout(2500);
+    const tot = lecturas.reduce((a, b) => a + b, 0);
+    console.log(`   [info] 50 espectadores, 1 ronda real: ${tot} lecturas (${(tot / N).toFixed(1)} por espectador = 1 inicial + ${(tot / N - 1).toFixed(1)} cambios: «animando» y «revelado»); escrituras del admin: 1 sorteo + 2 de publico/sorteo = 3`);
+    assert.ok(lecturas.every((x) => x === 3), "3 lecturas por espectador: inicial + animando + revelado: " + lecturas.join(","));
+    assert.equal((await listar("sorteos")).length, 1);
+    bajas.forEach((b) => b()); await Promise.all(apps.map(async (a) => { try { await terminate(getFirestore(a)); await deleteApp(a); } catch {} }));
+    await limpiarSorteos(); await q.close();
+  });
   await prueba("panel y sorteo: sin desbordamiento horizontal a 360 px", async () => {
     const m = await p.context().newPage(); await m.setViewportSize({ width: 360, height: 740 });
     for (const pagina of ["panel", "sorteo"]) {
@@ -659,7 +823,14 @@ async function subtitulos(pg, ms = 60000) {
     for (const c of ["participantes", "correos", "sorteos", "lista"]) assert.equal((await listar(c)).length, 0, c);
     assert.equal((await leer("config/estado")).fields.registroAbierto.booleanValue, false);
     assert.ok(await leer(`admins/${UID}`), "admins no se toca");
+    assert.match(await w.textContent("#aviso"), /La transmisión en vivo quedó en espera/);
     await w.close();
+    // PASO 6: «Vaciar datos» deja publico/sorteo en {estado:"espera"} sin ganadorMascara (y el espectador vuelve a «Esperando el sorteo…»)
+    const pub = await leer("publico/sorteo");
+    assert.deepEqual(Object.keys(pub.fields), ["estado"]); assert.equal(pub.fields.estado.stringValue, "espera");
+    const v = await nuevaPagina(); await v.goto(`${BASE}/en-vivo.html?emulador`);
+    await v.waitForFunction(() => document.querySelector("#titulo-ev").textContent === "Esperando el sorteo…");
+    assert.equal(await v.evaluate(() => document.querySelector("#revelado-ev").hidden), true); await v.close();
   });
   // cerrar sesión
   await prueba("seguridad: datos YA guardados con <img src=x onerror=alert(1)> (nombre, nombre oficial, correo) se muestran como texto en panel y sorteo", async () => {
