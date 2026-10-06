@@ -35,6 +35,15 @@ async function sembrar(ruta, datos) {
     body: JSON.stringify({ fields: Object.fromEntries(Object.entries(datos).map(([k, v]) => [k, val(v)])) }) });
   assert.ok(r.ok, `sembrar ${ruta}: ${await r.text()}`);
 }
+// Reglas publicadas en el emulador: las actuales y una versión ANTERIOR (sin adminUid) para reproducir el desajuste de producción.
+const REGLAS = readFileSync(join(REPO, "firestore.rules"), "utf8");
+const REGLAS_ANTIGUAS = REGLAS.replaceAll("'ronda', 'adminUid']", "'ronda']").replace(/\n\s*&& request\.resource\.data\.adminUid == request\.auth\.uid[^\n]*/, "");
+assert.ok(REGLAS.includes("adminUid") && !REGLAS_ANTIGUAS.includes("adminUid"), "la versión antigua de las reglas no debe mencionar adminUid");
+async function ponerReglas(contenido) {
+  const r = await fetch("http://127.0.0.1:8080/emulator/v1/projects/sorteoinmuno:securityRules", { method: "PUT", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ rules: { files: [{ name: "firestore.rules", content: contenido }] } }) });
+  assert.ok(r.ok, await r.text());
+}
 async function borrar(ruta) { await fetch(`${FS}/${ruta}`, { method: "DELETE", headers: OWNER }); }
 async function leer(ruta) { const r = await fetch(`${FS}/${ruta}`, { headers: OWNER }); return r.ok ? r.json() : null; }
 async function listar(col) { const r = await fetch(`${FS}/${col}`, { headers: OWNER }); return (await r.json()).documents ?? []; }
@@ -328,9 +337,9 @@ const DENEGADO = /avisa a la maestra/;
   assert.deepEqual(p.errores, [], "errores JS en panel: " + p.errores);
 
   // ---------------- SORTEO (movimiento reducido para ir rápido) + una corrida con animación completa
-  await prueba("panel: 'Descargar registro del sorteo' sin sorteos guardados avisa y no descarga", async () => {
+  await prueba("panel: 'Descargar registro del sorteo' sin sorteos guardados explica que el modo Ensayo no guarda y no descarga", async () => {
     await p.click("#descargar-registro");
-    await p.waitForFunction(() => /Todavía no hay sorteos guardados/.test(document.querySelector("#aviso").textContent));
+    await p.waitForFunction(() => /Aún no hay sorteos guardados \(el modo Ensayo no guarda\)/.test(document.querySelector("#aviso").textContent));
   });
   const s = await p.context().newPage(); s.errores = []; s.on("pageerror", (e) => s.errores.push(e.message));
   await s.emulateMedia({ reducedMotion: "reduce" });
@@ -359,6 +368,37 @@ const DENEGADO = /avisa a la maestra/;
     await s.keyboard.press("n"); assert.equal(await s.getAttribute("#nombre-completo", "aria-pressed"), "true");
     await s.keyboard.press("n"); assert.equal(await s.getAttribute("#nombre-completo", "aria-pressed"), "false");
   });
+  await prueba("ETAPA 0 · reglas publicadas ANTIGUAS (sin adminUid): mensaje exacto de reglas, código en consola, nada guardado ni revelado", async () => {
+    const consola = []; const oyente = (m) => { if (m.type() === "error") consola.push(m.text()); }; s.on("console", oyente);
+    await s.uncheck("#ensayo"); await ponerReglas(REGLAS_ANTIGUAS); await s.waitForTimeout(800);
+    await s.waitForFunction(() => !document.querySelector("#sortear").disabled);
+    await s.click("#sortear");
+    await s.waitForFunction(() => document.querySelector("#aviso").textContent.length > 0);
+    assert.equal(await s.textContent("#aviso"), "Las reglas de Firestore publicadas no coinciden con esta versión de la app. Republica firestore.rules.");
+    assert.ok(consola.some((c) => c.includes("[sorteo] no se pudo guardar la ronda: permission-denied")), "console.error con el código: " + consola.join(" | "));
+    assert.equal((await listar("sorteos")).length, 0, "no se guardó nada");
+    assert.equal(await s.isHidden("#resultado"), true, "no se reveló a nadie");
+    assert.equal(await s.isDisabled("#sortear"), false, "se puede reintentar");
+    s.off("console", oyente);
+    await ponerReglas(REGLAS); await s.waitForTimeout(800);
+  });
+  await prueba("ETAPA 0 · sin conexión: mensaje de conexión (no de reglas), falla rápido y no deja escrituras en cola", async () => {
+    const consola = []; const oyente = (m) => { if (m.type() === "error") consola.push(m.text()); }; s.on("console", oyente);
+    await s.waitForFunction(() => !document.querySelector("#sortear").disabled);
+    await s.context().setOffline(true);
+    const t0 = Date.now(); await s.click("#sortear");
+    await s.waitForFunction(() => document.querySelector("#aviso").textContent.length > 0, null, { timeout: 20000 });
+    const seg = (Date.now() - t0) / 1000;
+    const t = await s.textContent("#aviso");
+    assert.match(t, /No hay conexión con el servidor/); assert.ok(!/reglas/i.test(t), t);
+    assert.ok(seg < 15, `debe fallar rápido, tardó ${seg} s`);
+    assert.ok(consola.some((c) => /\[sorteo\] no se pudo guardar la ronda: (unavailable|deadline-exceeded|cancelled|failed-precondition)/.test(c)), consola.join(" | "));
+    assert.equal(await s.isHidden("#resultado"), true);
+    await s.context().setOffline(false); await s.waitForTimeout(4000);
+    assert.equal((await listar("sorteos")).length, 0, "nada quedó en cola para aplicarse después");
+    s.off("console", oyente);
+    await s.waitForFunction(() => !document.querySelector("#sortear").disabled);
+  });
   const ganadores = [];
   await prueba("sorteo real: guarda ronda, adminUid, excluye previos con 'Volver a sortear' y nunca repite", async () => {
     await s.uncheck("#ensayo");
@@ -377,6 +417,13 @@ const DENEGADO = /avisa a la maestra/;
     assert.deepEqual(docs.map((d) => Number(d.fields.ronda.integerValue)).sort(), [1, 2, 3]);
     assert.deepEqual(docs.map((d) => Number(d.fields.totalParticipantes.integerValue)).sort(), [1, 2, 3]);
     for (const d of docs) assert.equal(d.fields.adminUid.stringValue, UID, "adminUid = UID de la sesión");
+    // Contrato documento ↔ reglas: los campos escritos por la app son EXACTAMENTE los de hasOnly/hasAll de firestore.rules
+    const bloque = REGLAS.slice(REGLAS.indexOf("match /sorteos/{id}"));
+    const permitidos = [...bloque.matchAll(/hasOnly\(\[([^\]]+)\]\)/g)][0][1].split(",").map((x) => x.trim().replace(/'/g, "")).sort();
+    const exigidos = [...bloque.matchAll(/hasAll\(\[([^\]]+)\]\)/g)][0][1].split(",").map((x) => x.trim().replace(/'/g, "")).sort();
+    assert.deepEqual(permitidos, exigidos);
+    for (const d of docs) assert.deepEqual(Object.keys(d.fields).sort(), permitidos, "campos del documento = campos de las reglas");
+    for (const d of docs) assert.ok(d.fields.fecha.timestampValue && await leer(`participantes/${d.fields.ganadorClave.stringValue}`), "fecha del servidor y ganador existente");
     assert.equal(await s.isDisabled("#sortear"), true); // sin elegibles
   });
   await prueba("panel: 'Descargar registro del sorteo' genera el archivo con fecha, ronda, total y nombre OFICIAL", async () => {

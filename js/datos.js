@@ -1,6 +1,6 @@
 // Acceso a Firestore. Las colecciones sensibles solo las lee un admin (las reglas lo imponen).
 import {
-  collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp, deleteDoc,
+  collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp, deleteDoc, runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { db, auth } from "./firebase.js";
 import { claveDeNombre, limpiarNombre, validarNombre, normalizarCorreo, esCorreoValido, DOMINIO_CORREO } from "./normalizar.js";
@@ -63,11 +63,19 @@ export async function guardarLista(entradas) {
   }
 }
 
-/** Guarda un sorteo (las reglas exigen fecha = hora del servidor y ganador existente). */
+/**
+ * Guarda un sorteo (las reglas exigen: exactamente fecha, totalParticipantes, ganadorClave, ronda y adminUid;
+ * fecha == request.time; adminUid == UID de la sesión; ganador existente en participantes).
+ * Se escribe con una TRANSACCIÓN, no con setDoc: setDoc sin conexión no falla, se encola y se aplica en silencio al
+ * volver la red (la pantalla se quedaría colgada y la ronda se guardaría sin que nadie lo sepa). La transacción
+ * necesita al servidor y falla con un código claro (unavailable, permission-denied…), que sorteo.js traduce.
+ */
 export async function guardarSorteo({ totalParticipantes, ganadorClave, ronda }) {
   const ref = doc(collection(db, "sorteos"));
-  const adminUid = auth.currentUser?.uid; // las reglas exigen que coincida con la sesión
-  await setDoc(ref, { fecha: serverTimestamp(), totalParticipantes, ganadorClave, ronda, adminUid });
+  const adminUid = auth.currentUser?.uid;
+  await runTransaction(db, async (tx) => {
+    tx.set(ref, { fecha: serverTimestamp(), totalParticipantes, ganadorClave, ronda, adminUid });
+  }, { maxAttempts: 1 });
   return ref.id;
 }
 

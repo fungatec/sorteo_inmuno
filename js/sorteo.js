@@ -9,6 +9,7 @@ import { leerColeccion, guardarSorteo } from "./datos.js";
 import { enteroAleatorio } from "./azar.js";
 import { crearEscena, FRASES } from "./escena.js";
 import { enmascararNombre, formatoTitulo } from "./sorteo-util.js";
+import { mensajeErrorGuardado } from "./errores-guardado.js";
 import { $, h, aviso, avisoConfigPendiente } from "./ui.js";
 
 const msg = $("#aviso"), proyeccion = $("#proyeccion"), boton = $("#sortear"), btnNombre = $("#nombre-completo");
@@ -100,9 +101,13 @@ async function sortear() {
     try {
       const id = await guardarSorteo({ totalParticipantes: pool.length, ganadorClave: p.id, ronda });
       sorteos.push({ id, ganadorClave: p.id, ronda });
-    } catch {
-      aviso(msg, "No se pudo guardar el sorteo, así que no se reveló a nadie. Revisa tu conexión e inténtalo de nuevo.", "error");
-      ocupado = false; preparar(); return;
+    } catch (err) {
+      const code = err?.code ?? err?.name ?? "desconocido";
+      console.error("[sorteo] no se pudo guardar la ronda:", code);           // solo el código: sirve para diagnosticar
+      aviso(msg, mensajeErrorGuardado(code, err?.message), "error");
+      ocupado = false; preparar();
+      leerColeccion("sorteos").then((s) => { sorteos = s.sort((a, b) => a.ronda - b.ronda); preparar(); }).catch(() => {}); // por si una escritura en vuelo llegó a aplicarse
+      return;
     }
   } else ensayoGanadores.add(p.id);
 

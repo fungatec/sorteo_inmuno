@@ -214,8 +214,8 @@ $("#form-alta").addEventListener("submit", async (e) => {
 async function descargarRegistro() {
   let sorteos;
   try { sorteos = await leerColeccion("sorteos"); }
-  catch { aviso(msg, "No se pudo leer el registro del sorteo. Revisa tu conexión.", "error"); return false; }
-  if (!sorteos.length) { aviso(msg, "Todavía no hay sorteos guardados (los ensayos no se registran).", "aviso"); return false; }
+  catch (err) { console.error("[panel] no se pudo leer sorteos:", err?.code ?? err?.name); aviso(msg, "No se pudo leer el registro del sorteo. Revisa tu conexión.", "error"); return false; }
+  if (!sorteos.length) { aviso(msg, "Aún no hay sorteos guardados (el modo Ensayo no guarda).", "aviso"); return false; }
   const nombreDe = (clave) => {
     const o = oficial(clave);
     return o ? { nombre: o, oficial: true } : { nombre: participantes.find((p) => p.id === clave)?.nombre ?? clave, oficial: false };
