@@ -578,7 +578,7 @@ export function crearEscenaInmune(canvas, { semilla = 1, forzarTipo = null } = {
   }
 
   // ------------------------------------------------------------------ escenas (mapa) y marco general
-  const DIBUJO = { E0: escenaE0, E1: escenaE1, E2: escenaE2, E3: escenaE3, E4: escenaE4, E5: escenaE5, E6: escenaE6 };
+  const DIBUJO = { INTRO: ({ reloj }) => dibujarIdle(reloj), E0: escenaE0, E1: escenaE1, E2: escenaE2, E3: escenaE3, E4: escenaE4, E5: escenaE5, E6: escenaE6 };
 
   function escenaActual(ta) {
     const L = anim.lista;
@@ -597,9 +597,10 @@ export function crearEscenaInmune(canvas, { semilla = 1, forzarTipo = null } = {
   function claveSubtitulo(esc, u) {
     switch (esc.id) {
       case "E0": return "E0"; case "E1": return "E1"; case "E2": return "E2"; case "E3": return "E3";
-      case "E4": return anim.desdeE4 ? "E4_RONDA" : "E4";
-      case "E5": return "E5";
-      default: return u < 0.37 ? "E6_PROLIF" : anim.tipo === "CD4" ? "E6_CD4" : "E6_CD8";
+      case "INTRO": return "INTRO";
+      case "E4": return anim.resumido ? "E4_S" : anim.desdeE4 ? "E4_RONDA" : "E4";
+      case "E5": return anim.resumido ? "E5_S" : "E5";
+      default: if (anim.resumido) return "E6_S"; return u < 0.37 ? "E6_PROLIF" : anim.tipo === "CD4" ? "E6_CD4" : "E6_CD8";
     }
   }
 
@@ -645,25 +646,26 @@ export function crearEscenaInmune(canvas, { semilla = 1, forzarTipo = null } = {
     /**
      * Reproduce la narración. `desdeE4`: las rondas siguientes arrancan en el ganglio (E4–E6, ~17 s).
      * `incluirE0`: antepone el elenco (frotis de sangre).
+     * `resumido` (modo por defecto): tarjeta de ~3 s + E4–E6 comprimidas (~15 s) con los subtítulos sencillos.
      */
-    reproducir(indice, { desdeE4 = false, incluirE0 = false } = {}) {
+    reproducir(indice, { desdeE4 = false, incluirE0 = false, resumido = false } = {}) {
       return new Promise((resolver) => {
         if (indice < 0 || indice >= T.length) return resolver();
-        const ids = desdeE4 ? ["E4", "E5", "E6"] : ["E1", "E2", "E3", "E4", "E5", "E6"].filter((id) => DISPONIBLES.has(id));
+        const ids = resumido ? ["INTRO", "E4", "E5", "E6"] : desdeE4 ? ["E4", "E5", "E6"] : ["E1", "E2", "E3", "E4", "E5", "E6"].filter((id) => DISPONIBLES.has(id));
         if (incluirE0 && !desdeE4 && DISPONIBLES.has("E0")) ids.unshift("E0");
         let ini = 0; const lista = [], inicio = {}, dur = {};
         // Con movimiento reducido no hay movimiento: cada escena es un fotograma fijo de 3 s con fundidos de 1,5 s.
         const FIJO = { E1: 0.9, E2: 0.85, E3: 0.9, E4: 0.95, E5: 0.95 };
         const pasos = ids.flatMap((id) => (reducido && id === "E6" ? [{ id, fijo: 0.3 }, { id, fijo: 0.97 }] : [{ id, fijo: reducido ? (FIJO[id] ?? 0.9) : undefined }]));
         for (const { id, fijo } of pasos) {
-          const e = ESCENAS.find((x) => x.id === id), d = reducido ? 3000 : e.dur;
+          const e = ESCENAS.find((x) => x.id === id) ?? ESC_INTRO, d = reducido ? 3000 : (resumido && DUR_RESUMIDO[id]) || e.dur;
           lista.push({ id, ini, dur: d, tiempo: e.tiempo, fijo }); inicio[id] = ini; dur[id] = d; ini += d;
         }
         const ahora = performance.now(), rv = mulberry32((semilla + 104729 * ++llamadas) >>> 0);
         // clones visitados por la DC en E4: cinco linfocitos distintos del ganador
         const otros = Array.from({ length: T.length }, (_, k) => k).filter((k) => k !== indice);
         for (let k = otros.length - 1; k > 0; k--) { const j = Math.floor(rv() * (k + 1)); [otros[k], otros[j]] = [otros[j], otros[k]]; }
-        anim = { t0: ahora, base: ahora, lista, inicio, dur, total: ini, ganador: indice, tipo: tipos[indice] ?? "CD8", desdeE4, visitados: otros.slice(0, Math.min(5, otros.length)), revelado: false, resuelto: false, resolver };
+        anim = { t0: ahora, base: ahora, lista, inicio, dur, total: ini, ganador: indice, tipo: tipos[indice] ?? "CD8", desdeE4, resumido, visitados: otros.slice(0, Math.min(5, otros.length)), revelado: false, resuelto: false, resolver };
         claveFase = null; ultimoProg = -1;
       });
     },
@@ -680,4 +682,7 @@ export function crearEscenaInmune(canvas, { semilla = 1, forzarTipo = null } = {
   };
 }
 
+// Animación resumida: la tarjeta introductoria dura 3 s y E4/E5 se comprimen a 4 s (E6 conserva sus 7 s): 3 + 15 = 18 s en total.
+const ESC_INTRO = { id: "INTRO", dur: 3000, tiempo: [0, 0] };
+const DUR_RESUMIDO = { E4: 4000, E5: 4000 };
 const DISPONIBLES = new Set(["E0", "E1", "E2", "E3", "E4", "E5", "E6"]);

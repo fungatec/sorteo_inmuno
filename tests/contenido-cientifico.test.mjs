@@ -1,12 +1,16 @@
 // Ejecutar: node tests/contenido-cientifico.test.mjs
 import assert from "node:assert/strict";
-import { SUBTITULOS, MAX_PALABRAS_SUBTITULO, palabras, FICHA, INNATA_ADAPTATIVA, FUENTES, ESCENAS, etiquetaTiempo, TARJETA } from "../js/contenido-cientifico.js";
+import { SUBTITULOS, MAX_PALABRAS_SUBTITULO, MAX_PALABRAS_SUBTITULO_SIMPLE, palabras, FICHA, INNATA_ADAPTATIVA, FUENTES, ESCENAS, etiquetaTiempo, TARJETA } from "../js/contenido-cientifico.js";
 
 for (const [k, t] of Object.entries(SUBTITULOS)) {
   assert.ok(palabras(t) <= MAX_PALABRAS_SUBTITULO, `${k}: ${palabras(t)} palabras > ${MAX_PALABRAS_SUBTITULO}`);
   assert.ok(t.length <= 135, `${k}: ${t.length} caracteres (no cabe en 2 líneas)`);
 }
-assert.equal(Object.keys(SUBTITULOS).length, 10);
+assert.equal(Object.keys(SUBTITULOS).length, 14);
+for (const k of ["INTRO", "E4_S", "E5_S", "E6_S"]) assert.ok(palabras(SUBTITULOS[k]) <= MAX_PALABRAS_SUBTITULO_SIMPLE, `${k}: ${palabras(SUBTITULOS[k])} palabras > ${MAX_PALABRAS_SUBTITULO_SIMPLE}`);
+assert.equal(SUBTITULOS.INTRO, "Una infección activó a una célula dendrítica. Llega al ganglio linfático.");
+assert.equal(SUBTITULOS.E5_S, "Uno reconoce el antígeno y se activa.");
+assert.ok(!/mueren|desaparecen/i.test(JSON.stringify(SUBTITULOS)), "los no elegidos no mueren ni desaparecen");
 // Frases exactas que pidió el inmunólogo (las demás se acortaron o reformularon solo por el límite de palabras)
 assert.equal(SUBTITULOS.E1, "Inmunidad innata: reconoce patrones del patógeno y da la alarma en minutos.");
 assert.equal(SUBTITULOS.E6_CD8, "Linfocito T CD8+: mata células infectadas con perforina y granzimas.");

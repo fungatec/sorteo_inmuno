@@ -43,16 +43,18 @@
       </div>
       <div class="mandos" id="mandos">
         <button type="button" id="sortear" disabled>Liberar el antígeno</button>
-        <button type="button" class="secundario" id="nombre-completo" hidden aria-pressed="false">Mostrar nombre completo</button>
-        <button type="button" class="secundario" id="btn-ficha" aria-haspopup="dialog">Ficha inmunológica (I)</button>
-        <button type="button" class="secundario" id="pantalla-completa">Pantalla completa</button>
+        <div class="mandos-chicos">
+          <button type="button" class="secundario" id="nombre-completo" hidden aria-pressed="false">Mostrar nombre completo</button>
+          <button type="button" class="secundario ico" id="btn-ficha" aria-haspopup="dialog" aria-label="Ficha inmunológica" title="Ficha inmunológica">i</button>
+          <button type="button" class="secundario" id="historia-completa" title="Inicia el sorteo con la historia completa de la respuesta inmune (≈ 30 s)">Ver historia completa</button>
+          <button type="button" class="secundario" id="pantalla-completa">Pantalla completa</button>
+        </div>
       </div>
     </section>
 
     <div class="opciones">
-      <label class="check"><input type="checkbox" id="ensayo"> Ensayo (no se guarda ni excluye a nadie definitivamente)</label>
+      <label class="check"><input type="checkbox" id="ensayo"> Ensayo (no se guarda)</label>
       <label class="check" id="etq-elenco"><input type="checkbox" id="elenco"> Mostrar primero el elenco: células de un frotis de sangre (+5 s)</label>
-      <p class="suave atajos" id="atajos">Atajos: <kbd>Espacio</kbd> inicia · <kbd>S</kbd> salta de escena · <kbd>C</kbd> subtítulos · <kbd>F</kbd> pantalla completa · <kbd>N</kbd> nombre completo · <kbd>I</kbd> ficha inmunológica</p>
     </div>
 
     <details id="previos" hidden>

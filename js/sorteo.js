@@ -1,6 +1,7 @@
-// Pantalla del sorteo / modo proyección. Dos animaciones intercambiables:
-//  - por defecto («inmune»): cada participante es un linfocito T virgen que patrulla un ganglio linfático; una célula
-//    dendrítica llega desde un tejido infectado y el sorteo ocurre en su encuentro (js/escena-inmune.js);
+// Pantalla del sorteo / modo proyección. Tres variantes de animación:
+//  - por defecto («resumido», ≈ 18 s): tarjeta de 3 s («Una infección activó a una célula dendrítica…») y las escenas E4–E6
+//    de la respuesta inmune (js/escena-inmune.js). El botón «Ver historia completa» lanza la ronda con E1–E6 (≈ 30 s);
+//  - ?modo=completo: la historia completa E0–E6 como animación por defecto (con barra «minutos → horas → días» y elenco);
 //  - ?modo=clasico (plan B del evento): la animación anterior de selección clonal, intacta (js/escena.js).
 // Reglas de oro (ver CLAUDE.md), idénticas en ambos modos:
 //  - el ganador sale de crypto.getRandomValues con muestreo por rechazo (js/azar.js), nunca Math.random;
@@ -26,14 +27,20 @@ let actual = null;                       // { p, oficial, mascara, ensayo } del 
 const ensayoGanadores = new Set();       // en ensayo se excluyen entre sí solo durante esta sesión de pantalla
 
 // ---- modo de animación y textos de la interfaz (los del modo clásico son los de siempre)
-const CLASICO = new URLSearchParams(location.search).get("modo") === "clasico";
-proyeccion.classList.add(CLASICO ? "clasico" : "inmune");
+const MODO = new URLSearchParams(location.search).get("modo");
+const CLASICO = MODO === "clasico", COMPLETO = MODO === "completo";
+proyeccion.classList.add(CLASICO ? "clasico" : "inmune", ...(CLASICO ? [] : [COMPLETO ? "completo" : "resumido"]));
 const TXT = CLASICO
   ? { uno: "clon en el repertorio", varios: "clones en el repertorio", iniciar: "Liberar el antígeno", otra: "Volver a sortear",
       tarjeta: () => "El antígeno reconoció a", sinElegibles: "No quedan clones elegibles: todos los participantes ya fueron ganadores.", agotado: "Ya no quedan clones elegibles para otra ronda." }
   : { uno: "linfocito T en el ganglio", varios: "linfocitos T en el ganglio", iniciar: "Iniciar la respuesta inmune", otra: "Activar otro linfocito",
       tarjeta: (tipo) => TARJETA[tipo] ?? TARJETA.CD8, sinElegibles: "No quedan linfocitos elegibles: todos los participantes ya fueron ganadores.", agotado: "Ya no quedan linfocitos para activar otro." };
-if (CLASICO) { $("#atajos").hidden = true; $("#etq-elenco").hidden = true; } else { $(".barra strong").textContent = "Respuesta inmune"; }
+const btnHistoria = $("#historia-completa");
+$("#etq-elenco").hidden = !COMPLETO;                       // el elenco (E0) solo existe en la historia completa
+btnHistoria.hidden = CLASICO || COMPLETO;                  // en los otros dos modos no hay nada que ampliar
+if (!CLASICO) $(".barra strong").textContent = "Respuesta inmune";
+/** Habilita o bloquea los botones que inician una ronda. */
+const fijarBoton = (deshabilitado) => { boton.disabled = deshabilitado; btnHistoria.disabled = deshabilitado; };
 
 const escena = CLASICO ? crearEscena($("#lienzo"), { semilla: enteroAleatorio(2 ** 32) })
                        : crearEscenaInmune($("#lienzo"), {
@@ -44,7 +51,7 @@ const escena = CLASICO ? crearEscena($("#lienzo"), { semilla: enteroAleatorio(2 
 const movimientoReducido = matchMedia("(prefers-reduced-motion: reduce)");
 escena.setReducido(movimientoReducido.matches);
 movimientoReducido.addEventListener("change", (e) => escena.setReducido(e.matches));
-escena.alFase((texto) => { $("#fase").textContent = texto; });
+escena.alFase((texto, clave) => { $("#fase").textContent = texto; proyeccion.classList.toggle("tarjeta-intro", clave === "INTRO"); });
 escena.alRevelar((info) => { if (actual && info?.tipo) actual.tipo = info.tipo; mostrarResultado(); });
 // Barra de tiempo («minutos → horas → días»): solo en el modo inmune, mientras dura la animación.
 const barra = $("#barra-tiempo");
@@ -90,7 +97,7 @@ function preparar() {
   btnNombre.textContent = "Mostrar nombre completo";
   $("#fase").textContent = pool.length && CLASICO ? FRASES[0] : "";
   boton.textContent = sorteos.length || ensayoGanadores.size ? TXT.otra : TXT.iniciar;
-  boton.disabled = pool.length === 0 || ocupado;
+  fijarBoton(pool.length === 0 || ocupado);
   if (!pool.length) aviso(msg, participantes.length ? TXT.sinElegibles : "No hay participantes inscritos. Revisa el panel.", "aviso");
   const previos = sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${nombreVisible(s.ganadorClave)}`));
   $("#lista-previos").replaceChildren(...previos); $("#previos").hidden = !previos.length;
@@ -115,14 +122,15 @@ btnNombre.addEventListener("click", () => {
 ensayoChk.addEventListener("change", () => { if (ocupado) { ensayoChk.checked = !ensayoChk.checked; return; } ensayoGanadores.clear(); narrativaMostrada = false; preparar(); });
 
 // ------------------------------------------------------------------ sorteo
-async function sortear() {
+async function sortear({ completa = false } = {}) {   // completa: botón «Ver historia completa» (E1–E6) en el modo por defecto
   if (ocupado || boton.disabled) return;
-  ocupado = true; boton.disabled = true; btnNombre.hidden = true; aviso(msg, "");
+  ocupado = true; fijarBoton(true); btnNombre.hidden = true; aviso(msg, "");
   btnNombre.setAttribute("aria-pressed", "false"); btnNombre.textContent = "Mostrar nombre completo";
   $("#resultado").hidden = true; escena.reiniciar();
 
   const ensayo = ensayoChk.checked, pool = elegibles();
-  const desdeE4 = narrativaMostrada || sorteos.length > 0;          // rondas siguientes: arrancan en el ganglio (E4)
+  const larga = !CLASICO && (COMPLETO || completa);                  // historia completa: con barra de tiempo
+  const desdeE4 = COMPLETO && (narrativaMostrada || sorteos.length > 0);   // modo completo: las rondas siguientes arrancan en E4
   if (!pool.length) { ocupado = false; preparar(); return; }
   const indice = enteroAleatorio(pool.length);       // ← la elección (crypto + muestreo por rechazo)
   const p = pool[indice], ronda = sorteos.length + 1;
@@ -148,21 +156,22 @@ async function sortear() {
   escena.establecerClones(pool.length);               // un clon por participante elegible de esta ronda
   $("#contador").textContent = pool.length;
   $("#ronda").textContent = ensayo ? "Ensayo" : `Ronda ${ronda}`;
-  if (!CLASICO) { barra.hidden = false; barra.style.setProperty("--avance", "0%"); }
+  barra.hidden = !larga; if (larga) barra.style.setProperty("--avance", "0%");
   const iv = escena.indiceVisual(indice, pool.length, enteroAleatorio);
   actual.tipo = escena.tipoDe?.(iv);
-  await escena.reproducir(iv, CLASICO ? undefined : { desdeE4, incluirE0: elencoChk.checked });
+  await escena.reproducir(iv, CLASICO ? undefined : { desdeE4, incluirE0: COMPLETO && elencoChk.checked, resumido: !larga });
   narrativaMostrada = true;
 
   ocupado = false;
   const quedan = elegibles().length;
-  boton.textContent = TXT.otra; boton.disabled = quedan === 0;
+  boton.textContent = TXT.otra; fijarBoton(quedan === 0);
   if (!quedan) aviso(msg, TXT.agotado, "aviso");
   mostrarResultado(); if (CLASICO) $("#fase").textContent = "Clon seleccionado.";
   if (!ensayo) $("#lista-previos").replaceChildren(...sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${nombreVisible(s.ganadorClave)}`)));
   $("#previos").hidden = !sorteos.length;
 }
-boton.addEventListener("click", sortear);
+boton.addEventListener("click", () => sortear());
+btnHistoria.addEventListener("click", () => sortear({ completa: true }));
 
 // ------------------------------------------------------------------ pantalla completa y atajos
 const puedePantalla = !!proyeccion.requestFullscreen;
@@ -190,7 +199,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "i" || e.key === "I") { ficha.alternar(); return; }
   if (ficha.abierta) return;                                          // con la ficha abierta solo funcionan I y Esc
   // Espacio/Enter ya activan de forma nativa los botones, enlaces y resúmenes enfocados.
-  if ((e.key === " " || e.key === "Enter") && !e.target.closest?.("button, summary, a")) { e.preventDefault(); sortear(); }
+  if ((e.key === " " || e.key === "Enter") && !e.target.closest?.("button, summary, a")) { e.preventDefault(); sortear(); }   // los atajos no se muestran en pantalla, pero siguen activos
   else if (e.key === "f" || e.key === "F") alternarPantalla();
   else if ((e.key === "s" || e.key === "S") && !CLASICO) escena.saltar?.();
   else if (e.key === "c" || e.key === "C") proyeccion.classList.toggle("sin-subtitulos");

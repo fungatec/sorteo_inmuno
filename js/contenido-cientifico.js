@@ -16,7 +16,13 @@ export const SUBTITULOS = {
   E6_PROLIF: "Con IL-2 y coestimulación, el linfocito prolifera y se diferencia en células efectoras.",
   E6_CD8: "Linfocito T CD8+: mata células infectadas con perforina y granzimas.",
   E6_CD4: "Linfocito T CD4+: coordina la respuesta con citocinas; IFN-γ activa macrófagos.",
+  // Versión por defecto (animación resumida E4–E6, máx. 12 palabras, vocabulario sencillo; el término técnico va una sola vez).
+  INTRO: "Una infección activó a una célula dendrítica. Llega al ganglio linfático.",
+  E4_S: "Cada participante es un linfocito T. La célula dendrítica los recorre.",
+  E5_S: "Uno reconoce el antígeno y se activa.",
+  E6_S: "El linfocito activado se multiplica y entra en acción.",
 };
+export const MAX_PALABRAS_SUBTITULO_SIMPLE = 12;
 
 export const MAX_PALABRAS_SUBTITULO = 18;
 export const palabras = (texto) => String(texto).trim().split(/\s+/).filter(Boolean).length;

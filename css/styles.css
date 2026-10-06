@@ -218,12 +218,37 @@ dialog::backdrop { background: rgba(5, 48, 67, .65); }
   border-radius: 99px; background: rgba(5, 48, 67, .82); border: 1px solid rgba(167, 240, 243, .35); overflow: hidden; pointer-events: none; }
 .barra-tiempo .tramo { position: relative; z-index: 1; text-align: center; font-size: .78rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--celeste); }
 .barra-tiempo .relleno { position: absolute; left: 0; top: 0; bottom: 0; width: var(--avance, 0%); background: linear-gradient(90deg, rgba(37, 169, 224, .45), rgba(167, 240, 243, .5)); transition: width .25s linear; }
-.proyeccion.inmune .resultado { top: 22%; width: min(80%, 30rem); background: rgba(5, 48, 67, .86); border: 2px solid var(--verde); border-radius: var(--radio); padding: 1rem 1.4rem; }
-.proyeccion.inmune .resultado .suave { font-size: clamp(.9rem, 2.1cqw, 1.6rem); font-weight: 700; color: var(--celeste); opacity: 1; }
-.proyeccion.inmune .ganador-nombre { font-size: clamp(1.7rem, 5cqw, 4rem); }
+.proyeccion.inmune .resultado { top: 29%; width: min(90%, 46rem); background: rgba(5, 48, 67, .95); border: 2px solid var(--verde); border-radius: var(--radio); padding: 1rem 1.4rem; }
+.proyeccion.inmune .resultado:not([hidden]) { display: flex; flex-direction: column; align-items: center; }
+/* Revelado: el nombre enmascarado en grande (verde orgánico) y, debajo y pequeño, el tipo de linfocito activado. */
+.proyeccion.inmune .ganador-nombre { order: 1; font-size: clamp(2.1rem, 7cqw, 6rem); }
+.proyeccion.inmune .resultado .suave { order: 2; margin: .6rem 0 0; font-size: clamp(.8rem, 1.5cqw, 1.2rem); font-weight: 600; color: var(--celeste); opacity: 1; }
+.proyeccion.inmune .etiqueta-ensayo { order: 0; }
 @media (max-width: 639px) {
   .proyeccion.inmune .fase { bottom: 2.6rem; width: calc(100% - 1rem); font-size: .95rem; }
   .proyeccion.inmune .mandos { bottom: auto; }
+}
+
+/* ---- Paso 5: pantalla de sorteo mínima ---- */
+.mandos-chicos { display: contents; }
+button.ico { min-width: 40px; padding: .4rem; border-radius: 99px; font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 700; font-size: 1.15rem; line-height: 1; }
+/* Dos filas fijas: el botón principal, grande, y debajo los controles pequeños */
+.proyeccion.inmune .mandos { flex-direction: column; flex-wrap: nowrap; align-items: center; gap: .6rem; }
+.proyeccion.inmune .mandos-chicos { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; }
+.proyeccion.inmune #sortear { min-height: 64px; padding: .9rem 2.6rem; font-size: clamp(1.1rem, 2cqw, 1.7rem); }
+.proyeccion.inmune.resumido .mandos { bottom: 1rem; }            /* sin barra de tiempo: los mandos bajan */
+.proyeccion.inmune.completo .mandos { bottom: 2.9rem; }
+.proyeccion.resumido .fase { bottom: 8.8rem; }
+.proyeccion.completo .fase { bottom: 11.2rem; }
+/* Tarjeta introductoria (≈ 3 s): el subtítulo se muestra grande y centrado */
+.proyeccion.inmune.tarjeta-intro .fase { top: 50%; bottom: auto; transform: translate(-50%, -50%); width: min(82%, 52rem); text-align: center; padding: 1.4rem 2rem;
+  font-size: clamp(1.2rem, 3.3cqw, 3rem); font-weight: 600; background: rgba(5, 48, 67, .92); border: 2px solid var(--cielo); -webkit-line-clamp: 3; }
+@media (max-width: 639px) {
+  .mandos-chicos { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; }
+  .proyeccion.inmune .mandos { flex-direction: column; align-items: stretch; }
+  .proyeccion.inmune.resumido .mandos, .proyeccion.inmune.completo .mandos { bottom: auto; }
+  .proyeccion.resumido .fase, .proyeccion.completo .fase { bottom: 2.6rem; }
+  .proyeccion.inmune.tarjeta-intro .fase { top: 45%; bottom: auto; width: calc(100% - 1.5rem); font-size: 1.1rem; padding: 1rem; }
 }
 
 /* ---- Ficha inmunológica ---- */

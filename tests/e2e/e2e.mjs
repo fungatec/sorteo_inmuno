@@ -461,8 +461,12 @@ async function subtitulos(pg, ms = 60000) {
   // corrida con animación completa (sin reduced-motion)
   for (const d of await listar("sorteos")) await fetch(`http://127.0.0.1:8080/v1/${d.name}`, { method: "DELETE", headers: OWNER });
   const a = await p.context().newPage(); a.errores = []; a.on("pageerror", (e) => a.errores.push(e.message));
-  await a.goto(`${BASE}/sorteo.html?emulador`); await a.waitForFunction(() => document.querySelector("#contador").textContent === "3");
-  await prueba("sorteo con animación completa: escenas E1–E6 en orden, barra de tiempo, revelación a ~30 s y resultado enmascarado", async () => {
+  await a.goto(`${BASE}/sorteo.html?emulador&modo=completo`); await a.waitForFunction(() => document.querySelector("#contador").textContent === "3");
+  await prueba("?modo=completo: pantalla con elenco y sin «Ver historia completa»", async () => {
+    assert.equal(await a.isVisible("#etq-elenco"), true); assert.equal(await a.isHidden("#historia-completa"), true);
+    assert.equal(await a.evaluate(() => document.querySelector("#proyeccion").classList.contains("completo")), true);
+  });
+  await prueba("?modo=completo · animación completa: escenas E1–E6 en orden, barra de tiempo, revelación a ~30 s y resultado enmascarado", async () => {
     await a.check("#ensayo");
     assert.equal(await a.isHidden("#barra-tiempo"), true);
     await a.click("#sortear");
@@ -478,7 +482,7 @@ async function subtitulos(pg, ms = 60000) {
     assert.match(await a.textContent("#tarjeta-tipo"), /^Linfocito T CD[48]\+ activado$/);
     console.log(`   [info] revelación a los ${seg.toFixed(1)} s`);
   });
-  await prueba("sorteo: la nueva ronda arranca en E4 (~16 s), sin E1–E3, con el subtítulo 'Una respuesta real es policlonal…'", async () => {
+  await prueba("?modo=completo: la nueva ronda arranca en E4 (~16 s), sin E1–E3, con el subtítulo 'Una respuesta real es policlonal…'", async () => {
     await a.waitForFunction(() => !document.querySelector("#sortear").disabled);
     assert.equal(await a.textContent("#sortear"), "Activar otro linfocito");
     await a.click("#sortear");
@@ -520,6 +524,63 @@ async function subtitulos(pg, ms = 60000) {
     assert.ok(MASCARAS.includes(await q.textContent("#ganador")));
     assert.deepEqual(q.errores, []); await q.close();
   });
+  await prueba("PASO 5 · pantalla mínima: botón principal grande, controles pequeños, ficha «i» y sin pistas de teclas (los atajos siguen activos)", async () => {
+    const q = await nuevaSorteo("");
+    const visibles = await q.evaluate(() => [...document.querySelectorAll("#proyeccion button")].filter((b) => !b.hidden && b.offsetParent).map((b) => b.id));
+    assert.deepEqual(visibles.sort(), ["btn-ficha", "historia-completa", "pantalla-completa", "sortear"]);
+    assert.equal(await q.textContent("#btn-ficha"), "i"); assert.equal(await q.getAttribute("#btn-ficha", "aria-label"), "Ficha inmunológica");
+    assert.equal(await q.textContent("#historia-completa"), "Ver historia completa");
+    const alto = (id) => q.evaluate((i) => document.querySelector(i).getBoundingClientRect().height, id);
+    assert.ok(await alto("#sortear") >= 60 && await alto("#sortear") > await alto("#pantalla-completa") * 1.4, "el botón principal es el más grande");
+    assert.equal(await q.locator("kbd, #atajos").count(), 0, "sin pistas de teclas");
+    assert.ok(!/Espacio|atajo/i.test(await q.textContent("main")), "ningún texto menciona teclas");
+    assert.equal(await q.isHidden("#etq-elenco"), true); assert.equal(await q.isHidden("#barra-tiempo"), true);
+    assert.equal(await q.isVisible("#ensayo"), true);
+    assert.equal(await q.locator('header a[href="panel.html"]').count(), 1); assert.equal(await q.isVisible("#salir"), true);
+    await q.keyboard.press("i"); await q.waitForSelector("#ficha:not([hidden])"); await q.keyboard.press("Escape");   // los atajos siguen funcionando
+    assert.deepEqual(q.errores, []); await q.close();
+  });
+  await prueba("PASO 5 · animación por defecto: tarjeta de 3 s + E4–E6, subtítulos sencillos (≤ 12 palabras), sin barra de tiempo, revelado entre 14 y 18 s", async () => {
+    const q = await nuevaSorteo("", false);
+    await q.check("#ensayo"); await q.click("#sortear");
+    let barraVisible = false; const t0 = Date.now(), vistos = [];
+    while (await q.isHidden("#resultado") && Date.now() - t0 < 30000) {
+      const f = await q.textContent("#fase"); if (f && vistos.at(-1) !== f) vistos.push(f);
+      if (await q.isVisible("#barra-tiempo")) barraVisible = true; await q.waitForTimeout(100);
+    }
+    const seg = (Date.now() - t0) / 1000;
+    assert.ok(seg >= 14 && seg <= 18, `revelado a los ${seg.toFixed(1)} s`);
+    assert.deepEqual(vistos, [SUBTITULOS.INTRO, SUBTITULOS.E4_S, SUBTITULOS.E5_S, SUBTITULOS.E6_S]);
+    assert.ok(vistos.every((t) => t.split(/\s+/).length <= 12));
+    assert.equal(barraVisible, false, "la barra de tiempo solo aparece en la historia completa");
+    // Revelado: nombre enmascarado grande y verde; debajo, pequeño, el tipo de linfocito
+    const g = await q.evaluate(() => { const n = document.querySelector("#ganador"), t = document.querySelector("#tarjeta-tipo");
+      return { colorN: getComputedStyle(n).color, tamN: parseFloat(getComputedStyle(n).fontSize), tamT: parseFloat(getComputedStyle(t).fontSize),
+        yN: n.getBoundingClientRect().top, yT: t.getBoundingClientRect().top }; });
+    assert.equal(g.colorN, "rgb(69, 172, 77)"); assert.ok(g.tamN > 2 * g.tamT, `${g.tamN} vs ${g.tamT}`); assert.ok(g.yT > g.yN, "el tipo va debajo del nombre");
+    assert.match(await q.textContent("#tarjeta-tipo"), /^Linfocito T CD[48]\+ activado$/);
+    assert.ok(MASCARAS.includes(await q.textContent("#ganador")));
+    console.log(`   [info] animación por defecto: revelado a los ${seg.toFixed(1)} s`);
+    assert.deepEqual(q.errores, []); await q.close();
+  });
+  await prueba("PASO 5 · «Ver historia completa»: lanza la ronda con E1–E6 y la barra «minutos → horas → días»; la ronda siguiente vuelve a la animación resumida", async () => {
+    const q = await nuevaSorteo("");
+    await q.check("#ensayo"); await q.click("#historia-completa");
+    const t0 = Date.now(), vistos = []; let barra = false;
+    while (await q.isHidden("#resultado") && Date.now() - t0 < 60000) {
+      const f = await q.textContent("#fase"); if (f && vistos.at(-1) !== f) vistos.push(f);
+      if (await q.isVisible("#barra-tiempo")) barra = true; await q.waitForTimeout(100);
+    }
+    // (con movimiento reducido el revelado coincide con el cambio de E6_PROLIF al subtítulo final, que puede no alcanzar a leerse)
+    assert.deepEqual(vistos.slice(0, 6), [SUBTITULOS.E1, SUBTITULOS.E2, SUBTITULOS.E3, SUBTITULOS.E4, SUBTITULOS.E5, SUBTITULOS.E6_PROLIF], vistos.join(" > "));
+    assert.equal(barra, true);
+    await q.waitForFunction(() => !document.querySelector("#sortear").disabled && !document.querySelector("#historia-completa").disabled);
+    await q.click("#sortear");
+    const v2 = []; const t1 = Date.now();
+    while (await q.isHidden("#resultado") && Date.now() - t1 < 40000) { const f = await q.textContent("#fase"); if (f && v2.at(-1) !== f) v2.push(f); await q.waitForTimeout(100); }
+    assert.equal(v2[0], SUBTITULOS.INTRO); assert.ok(!v2.includes(SUBTITULOS.E1)); assert.equal(await q.isHidden("#barra-tiempo"), true);
+    assert.deepEqual(q.errores, []); await q.close();
+  });
   await prueba("sorteo: tecla C oculta/muestra subtítulos; tecla I abre la ficha (diálogo modal), Espacio no sortea con ella abierta y Esc/I la cierran", async () => {
     const q = await nuevaSorteo("");
     await q.evaluate(() => document.activeElement?.blur());
@@ -537,8 +598,8 @@ async function subtitulos(pg, ms = 60000) {
     await q.keyboard.press("i"); await q.waitForSelector("#ficha", { state: "hidden" });
     assert.deepEqual(q.errores, []); await q.close();
   });
-  await prueba("sorteo: casilla «elenco» antepone E0 (frotis de sangre) y la tecla S salta de escena", async () => {
-    const q = await nuevaSorteo("");
+  await prueba("?modo=completo: casilla «elenco» antepone E0 (frotis de sangre) y la tecla S salta de escena", async () => {
+    const q = await nuevaSorteo("&modo=completo");
     await q.check("#ensayo"); await q.check("#elenco"); await q.click("#sortear");
     await q.waitForFunction((t) => document.querySelector("#fase").textContent === t, SUBTITULOS.E0);
     await q.keyboard.press("s");
@@ -549,7 +610,7 @@ async function subtitulos(pg, ms = 60000) {
   await prueba("MODO CLÁSICO (?modo=clasico): textos y escenas de selección clonal intactos, revelación a 8–12 s, máscara y sin atajos del modo inmune", async () => {
     const q = await nuevaSorteo("&modo=clasico", false);
     assert.equal(await q.textContent("#sortear"), "Liberar el antígeno"); assert.equal(await q.textContent("#contador-texto"), "clones en el repertorio");
-    assert.equal(await q.isHidden("#atajos"), true); assert.equal(await q.isHidden("#etq-elenco"), true); assert.equal(await q.isHidden("#barra-tiempo"), true);
+    assert.equal(await q.locator("kbd").count(), 0); assert.equal(await q.isHidden("#historia-completa"), true); assert.equal(await q.isHidden("#etq-elenco"), true); assert.equal(await q.isHidden("#barra-tiempo"), true);
     assert.equal(await q.evaluate(() => document.querySelector("#proyeccion").classList.contains("clasico")), true);
     await q.check("#ensayo"); await q.click("#sortear");
     const { vistos, seg } = await subtitulos(q, 30000);
@@ -631,7 +692,7 @@ async function subtitulos(pg, ms = 60000) {
     await x.close();
     await borrar(`lista/${k}`); await borrar(`participantes/${k}`); await borrar(`correos/${encodeURIComponent(CORREO)}`);
   });
-  await prueba("rendimiento: 100 participantes → animación fluida (≥ 30 fps) y revelación a ~30 s", async () => {
+  await prueba("rendimiento: 100 participantes → animación fluida (≥ 30 fps) y revelación a ~17 s (animación por defecto)", async () => {
     const { claveDeNombre } = await import(`${REPO}/js/normalizar.js`);
     const N = ["Ana", "Luis", "Marta", "Pedro", "Sofia", "Diego", "Elena", "Raul", "Irene", "Hugo"];
     const A = ["Lopez", "Garcia", "Ruiz", "Soto", "Vega", "Mora", "Rios", "Cruz", "Paz", "Luna"];
@@ -649,7 +710,7 @@ async function subtitulos(pg, ms = 60000) {
     await f.waitForSelector("#resultado:not([hidden])", { timeout: 50000 });
     const dur = (Date.now() - t0) / 1000, fps = (await f.evaluate(() => window.__f)) / dur;
     console.log(`   [info] 100 participantes: revelación a los ${dur.toFixed(1)} s, ${fps.toFixed(0)} fps medios`);
-    assert.ok(dur >= 27 && dur <= 34, `duración ${dur}`); assert.ok(fps >= 30, `fps ${fps}`);
+    assert.ok(dur >= 14 && dur <= 18, `duración ${dur}`); assert.ok(fps >= 30, `fps ${fps}`);
     assert.deepEqual(f.errores, []); await f.close();
   });
   await prueba("salir: vuelve a login y las páginas de admin redirigen", async () => {
