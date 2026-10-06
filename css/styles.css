@@ -128,7 +128,16 @@ hr { border: 0; border-top: 1px solid var(--linea); margin: 1.5rem 0; }
 .repertorio { display: block; width: min(100%, 22rem); height: auto; margin: 0 auto 1rem; }
 .repertorio .existentes use { animation: surgir .5s ease-out both; }
 .repertorio .existentes use:nth-child(even) { animation-delay: .1s; }
-.repertorio .nuevo { animation: entrar 1.1s cubic-bezier(.2, .8, .2, 1) .5s both; }
+.repertorio .nuevo-t { transform-box: fill-box; transform-origin: center; animation: cruzar 2.6s cubic-bezier(.3, .1, .2, 1) .5s both; }
+@keyframes cruzar {            /* flota en la luz de la vénula → se adhiere a la pared → diapédesis (se estrecha) → se suma a los demás */
+  0% { transform: translate(0, -92px); opacity: 0; }
+  12% { opacity: 1; }
+  38% { transform: translate(24px, -78px); }
+  50% { transform: translate(0, -62px) scale(1, 1); }
+  62% { transform: translate(0, -48px) scale(.62, 1.35); }
+  78% { transform: translate(0, -22px) scale(.9, 1.1); }
+  100% { transform: none; }
+}
 @keyframes entrar { from { transform: translateY(-95px) scale(1.7); opacity: 0; } 55% { opacity: 1; } to { transform: none; opacity: 1; } }
 @keyframes surgir { from { opacity: 0; } to { opacity: 1; } }
 
@@ -168,7 +177,7 @@ dialog::backdrop { background: rgba(5, 48, 67, .65); }
 .proyeccion { position: relative; overflow: hidden; border-radius: var(--radio); background: var(--petroleo);
   height: clamp(22rem, 72vh, 46rem); margin-top: .5rem; --anillo: 150px; }
 .proyeccion .caja { position: absolute; inset: 0; --anillo: 150px; }
-.proyeccion canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.proyeccion .caja > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .proyeccion:fullscreen { border-radius: 0; height: 100vh; width: 100vw; }
 .proyeccion:fullscreen.inactivo { cursor: none; }
 .hud-sup { position: absolute; top: .75rem; left: .75rem; text-align: left; pointer-events: none; background: rgba(5, 48, 67, .78); border-radius: var(--radio); padding: .4rem .9rem; line-height: 1.2; }
@@ -197,3 +206,39 @@ dialog::backdrop { background: rgba(5, 48, 67, .65); }
   .proyeccion .fase { bottom: .75rem; }
   .proyeccion .mandos { position: static; flex-direction: column; align-items: stretch; padding: .75rem 1rem 1rem; }
 }
+
+/* ---- Paso 4 (rediseño inmunológico): subtítulos, barra de tiempo, modo "inmune" ---- */
+.proyeccion { container-type: inline-size; }
+.proyeccion.inmune .fase { bottom: 7.4rem; width: min(94%, 82rem); max-width: none; border-radius: var(--radio); padding: .45rem 1.2rem;
+  font-size: clamp(.9rem, 2.1cqw, 2.1rem); line-height: 1.3; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  transition: opacity 1.5s ease; }
+.proyeccion.sin-subtitulos .fase { opacity: 0; }
+.proyeccion.inmune .mandos { bottom: 2.9rem; }
+.barra-tiempo { position: absolute; left: 4%; right: 4%; bottom: .55rem; height: 1.7rem; display: grid; grid-template-columns: repeat(3, 1fr); align-items: center;
+  border-radius: 99px; background: rgba(5, 48, 67, .82); border: 1px solid rgba(167, 240, 243, .35); overflow: hidden; pointer-events: none; }
+.barra-tiempo .tramo { position: relative; z-index: 1; text-align: center; font-size: .78rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--celeste); }
+.barra-tiempo .relleno { position: absolute; left: 0; top: 0; bottom: 0; width: var(--avance, 0%); background: linear-gradient(90deg, rgba(37, 169, 224, .45), rgba(167, 240, 243, .5)); transition: width .25s linear; }
+.proyeccion.inmune .resultado { top: 22%; width: min(80%, 30rem); background: rgba(5, 48, 67, .86); border: 2px solid var(--verde); border-radius: var(--radio); padding: 1rem 1.4rem; }
+.proyeccion.inmune .resultado .suave { font-size: clamp(.9rem, 2.1cqw, 1.6rem); font-weight: 700; color: var(--celeste); opacity: 1; }
+.proyeccion.inmune .ganador-nombre { font-size: clamp(1.7rem, 5cqw, 4rem); }
+@media (max-width: 639px) {
+  .proyeccion.inmune .fase { bottom: 2.6rem; width: calc(100% - 1rem); font-size: .95rem; }
+  .proyeccion.inmune .mandos { bottom: auto; }
+}
+
+/* ---- Ficha inmunológica ---- */
+.ficha { position: absolute; inset: 0; z-index: 6; overflow: auto; background: var(--petroleo); text-align: left; padding: clamp(.75rem, 2cqw, 1.75rem); }
+.ficha-cuerpo { max-width: 78rem; margin: 0 auto; }
+.ficha-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .5rem; }
+.ficha-cabecera h2 { margin: 0; color: var(--celeste); }
+.ficha-rejilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); gap: 1rem; margin-block: 1rem; }
+.tarjeta-celula { background: rgba(167, 240, 243, .08); border: 1px solid rgba(167, 240, 243, .3); border-radius: var(--radio); padding: 1rem; font-size: .9rem; }
+.tarjeta-celula canvas { display: block; width: 96px; height: 96px; margin: 0 auto .5rem; }
+.tarjeta-celula h3 { margin: 0 0 .4rem; font-size: 1rem; color: var(--blanco); text-align: center; }
+.tarjeta-celula p { margin: 0 0 .5rem; line-height: 1.45; }
+.tarjeta-comp { grid-column: 1 / -1; }
+.tarjeta-comp .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+.tarjeta-comp h4 { margin: 0 0 .25rem; color: var(--celeste); }
+.ficha-fuentes { margin-top: 1rem; font-size: .8rem; }
+.ficha-fuentes li { margin-bottom: .3rem; }
+.proyeccion.ficha-abierta .fase, .proyeccion.ficha-abierta .barra-tiempo { visibility: hidden; }

@@ -28,9 +28,12 @@ js/normalizar.js                                     clave de nombre + validacio
 js/firebase.js  js/firebase-config.js                inicialización de Firebase
 js/registro.js  login.js  panel.js  sorteo.js        lógica por página
 js/auth.js  js/datos.js  js/ui.js  js/azar.js        sesión de admin · acceso a Firestore · DOM seguro · aleatoriedad
-js/escena.js  js/sorteo-util.js  js/login-errores.js  animación en Canvas · máscara/formato del nombre y registro descargable · mensajes del login (módulos puros)
+js/escena-inmune.js  js/celulas.js  js/ficha.js   escena de respuesta inmune (E0–E6) · biblioteca de células en Canvas · ficha inmunológica (I)
+js/contenido-cientifico.js                           FUENTE DE VERDAD del contenido científico: subtítulos, tarjetas, escenas, referencias
+js/escena.js                                         animación clásica de selección clonal (plan B: sorteo.html?modo=clasico)
+js/sorteo-util.js  js/login-errores.js  js/errores-guardado.js   máscara/formato del nombre y registro descargable · mensajes del login · errores de guardado (módulos puros)
 firestore.rules                                      reglas de seguridad (fuente de verdad)
-tests/{normalizar,azar,sorteo-util,login-errores}.test.mjs   node tests/<archivo> (sin dependencias)
+tests/{normalizar,azar,sorteo-util,login-errores,errores-guardado,contenido-cientifico}.test.mjs   node tests/<archivo> (sin dependencias)
 tests/reglas.emulador.mjs                            pruebas de reglas con emulador (ver README)
 tests/e2e/                                           pruebas de extremo a extremo con navegador + emuladores
 docs/CASOS_PRUEBA_REGLAS.md                          casos para el Rules Playground
@@ -103,10 +106,11 @@ El login muestra «Usuario» y «Contraseña». El usuario válido es **`admin12
 
 - **Elección:** `crypto.getRandomValues` con **muestreo por rechazo** (`js/azar.js`, sin sesgo de módulo). **Nunca `Math.random`** (ni en la animación: el azar visual usa un PRNG sembrado con `crypto`). `grep Math.random js/` solo debe encontrar comentarios.
 - **Orden:** se elige y se **guarda antes** de animar; si el guardado falla no se revela a nadie y se reintenta. `sorteos` guarda `fecha` (= `serverTimestamp()`), `totalParticipantes` (= tamaño del grupo elegible en esa ronda, tras excluir ganadores previos), `ganadorClave`, `ronda` y `adminUid`.
-- **«Volver a sortear»** (botón o Espacio): vuelve a sortear **al instante** excluyendo a los ganadores previos guardados y suma una ronda. **Casilla «Ensayo»:** anima sin guardar, con etiqueta «ENSAYO · no se guarda»; los ganadores de ensayo solo se excluyen entre sí durante esa sesión de pantalla. Los sorteos guardados no se editan y solo se borran con «Vaciar datos»: **ensaya siempre con la casilla marcada**.
+- **Nueva ronda** («Activar otro linfocito»; «Volver a sortear» en modo clásico; botón o Espacio): vuelve a sortear **al instante** excluyendo a los ganadores previos guardados y suma una ronda. **Casilla «Ensayo»:** anima sin guardar, con etiqueta «ENSAYO · no se guarda»; los ganadores de ensayo solo se excluyen entre sí durante esa sesión de pantalla. Los sorteos guardados no se editan y solo se borran con «Vaciar datos»: **ensaya siempre con la casilla marcada**.
 - **Nombre en pantalla:** siempre el **oficial** (`lista/{clave}.nombre`; si la clave no está en la lista —alta manual—, el capturado, con aviso al admin), nunca el tecleado en el registro. La lista viene en MAYÚSCULAS, sin acentos y como «Nombre Apellidos» (3 a 6 palabras): la **máscara** está en **formato título** (`enmascararNombre`: primera palabra = nombre de pila; las demás aportan inicial, **excepto** `de, del, la, las, los, y`): «MARTA ELENA RIOS Y VEGA SOTO» → «Marta E. R. V. S.»; «JULIO DE BELEN ORTIZ PAZ» → «Julio B. O. P.». La tecla **N** (o el botón) muestra el nombre completo, también en formato título (`formatoTitulo`: «Marta Elena Rios y Vega Soto»). **No lleva dígitos de código: no existe código de estudiante.** Si alguna vez la lista viniera como «Apellidos Nombre», la máscara mostraría un apellido.
 - **Modo proyección:** `sorteo.html` en pantalla completa (botón o **F**); los mandos se ocultan a los 3 s sin actividad y reaparecen al mover el ratón/tocar. Espacio/Enter = sortear. En pantallas < 640 px los mandos van bajo la escena. iOS no permite pantalla completa de un elemento: usar laptop.
-- **Guion de la animación (≈ 11,4 s; Canvas 2D sin librerías, ~60 fps con 100 participantes):** E1 repertorio 0–2,2 s (un linfocito B por participante, sin nombres) · E2 el antígeno (libro) explora 2,2–6,0 s · E3 reconocimiento 6,0–8,2 s (se une a UN clon; los demás se desvanecen) · E4 expansión clonal 8,2–11,4 s (1→2→4→8→16 en verde, anillo, nombre al ~45 %). `prefers-reduced-motion`: sin movimiento ni libro, fundido a la escena final (~1 s). Tope visual de 300 células (el sorteo usa a todos). Vocabulario y límites biológicos: ver «Metáfora visual».
+- **Modos de animación:** por defecto, la **respuesta inmune** (`js/escena-inmune.js`, ≈ 30 s; guion y reglas de exactitud en «Metáfora visual»). `sorteo.html?modo=clasico` conserva, intacta, la animación anterior de selección clonal (`js/escena.js`, ≈ 11,4 s: E1 repertorio de linfocitos B · E2 el antígeno (libro) explora · E3 reconocimiento de UN clon · E4 expansión clonal) con sus textos («Liberar el antígeno» / «Volver a sortear»); es el **plan B** del evento. Ambas: Canvas 2D sin librerías, azar visual con PRNG sembrado con `crypto`, tope visual de células, `prefers-reduced-motion` sin movimiento (en el modo inmune, fotogramas fijos de 3 s con fundidos de 1,5 s).
+- **Teclas (modo inmune):** Espacio/Enter inicia · **S** salta de escena · **C** oculta/muestra subtítulos · **I** ficha inmunológica (con ella abierta solo I/Esc) · **F** pantalla completa · **N** nombre completo. Casilla «elenco» antepone E0 (+5 s). Textos: «Iniciar la respuesta inmune», «Activar otro linfocito», «linfocitos T en el ganglio». Para pruebas locales, `?tipo=CD4|CD8` (solo en localhost) fija el tipo ilustrativo.
 - **Constancia:** el panel descarga `registro-sorteo-AAAA-MM-DD.txt` (fecha, ronda, total, ganador oficial, UID del admin; `textoRegistroSorteo`). Debe descargarse **antes** de «Vaciar datos».
 
 ## Seguridad de salida (XSS)
@@ -118,10 +122,10 @@ El login muestra «Usuario» y «Contraseña». El usuario válido es **`admin12
 
 ## Interfaz (Paso 2)
 
-- **Registro:** solo nombre completo y correo (no hay código de estudiante: ni el modelo ni las reglas lo admiten). Validación **en vivo** bajo cada campo (`validarEnVivo` + `mensajeErrorNombre`/`mensajeErrorCorreo`; p. ej. «El correo debe ser @alumnos.udg.mx»). Si `registroAbierto` es false, la tarjeta «El registro está cerrado» **reemplaza** al formulario. Una línea de privacidad: «Tus datos se usan solo para este sorteo y se eliminarán al terminar el evento» (solo es verdad si la admin usa «Vaciar datos»). Éxito: animación de un linfocito B (verde) incorporándose al repertorio.
+- **Registro:** solo nombre completo y correo (no hay código de estudiante: ni el modelo ni las reglas lo admiten). Validación **en vivo** bajo cada campo (`validarEnVivo` + `mensajeErrorNombre`/`mensajeErrorCorreo`; p. ej. «El correo debe ser @alumnos.udg.mx»). Si `registroAbierto` es false, la tarjeta «El registro está cerrado» **reemplaza** al formulario. Una línea de privacidad: «Tus datos se usan solo para este sorteo y se eliminarán al terminar el evento» (solo es verdad si la admin usa «Vaciar datos»). Título «Inscribe tu linfocito T», botón «Inscribir mi linfocito». Éxito: animación de un linfocito T virgen cruzando una vénula de endotelio alto hacia el ganglio, con el texto de «Metáfora visual».
 - **Panel:** interruptor accesible (`role="switch"`) de registro; tabla de participantes (nombre oficial, correo, origen, fecha) con búsqueda sin acentos y contador; pestañas operables con ← → Inicio Fin; alta manual con las mismas validaciones; eliminar con confirmación.
 - **Vaciar datos:** (antes, «Descargar registro del sorteo») diálogo modal que exige escribir `BORRAR` (botón deshabilitado hasta entonces, y se re-verifica al enviar). Cierra el registro primero y borra `participantes`, `correos`, `sorteos` y `lista` (no toca `admins` ni `config`). Irreversible: incluye el registro de ganadores.
-- Accesibilidad: auditada con axe-core (WCAG 2.0/2.1 A y AA) a 360 px en las cuatro pantallas, sin violaciones. Responsivo desde 360 px (la tabla se apila en tarjetas bajo 640 px). Cualquier cambio de interfaz debe mantener esa auditoría en cero.
+- Accesibilidad: auditada con axe-core (WCAG 2.0/2.1 A y AA) a 360 px en las cuatro pantallas, sin violaciones. Incluye sorteo en modo inmune y la ficha abierta. Responsivo desde 360 px (la tabla se apila en tarjetas bajo 640 px). Cualquier cambio de interfaz debe mantener esa auditoría en cero.
 
 ## Identidad visual
 
@@ -138,16 +142,22 @@ Criterios: minimalista, mucho espacio en blanco, **mobile-first** (los alumnos s
 
 Tipografía: Montserrat 400 (texto), 600 (etiquetas/botones), 700 (títulos).
 
-## Metáfora visual: selección clonal
+## Metáfora visual: respuesta inmune a *Listeria monocytogenes* (modo por defecto)
 
-Burnet (1959): cada **participante es un linfocito B** con un receptor (BCR) de especificidad única; el **libro es el antígeno**; el sorteo es el momento en que el antígeno **reconoce a un solo clon**, que luego se **expande (proliferación clonal)** para revelar al ganador.
+**Regla de oro: todo texto de la interfaz debe ser biológicamente correcto; ante la duda, usa solo lo que está en `js/contenido-cientifico.js` (sección «Contenido científico») y marca lo incierto con [VERIFICAR] en el README.** Ese módulo es la fuente de verdad (subtítulos, tarjetas, escenas, ficha y referencias); un test (`tests/contenido-cientifico.test.mjs`) verifica límites como las 18 palabras por subtítulo.
 
-Guía de textos y animación:
-- Registro → «Registra tu receptor» / «Tu clon queda en el repertorio». Total de inscritos → «clones en el repertorio».
-- Sorteo → el antígeno se acerca; el reconocimiento resalta **un** clon; ese clon prolifera (la célula se divide y se multiplica en pantalla) y se despliega el nombre en verde.
-- Vocabulario permitido: linfocito B, receptor (BCR), antígeno, reconocimiento, afinidad, clon, repertorio, activación, expansión/proliferación clonal.
-- **No mezclar con otros procesos:** nada de presentación por MHC, células presentadoras, linfocitos T cooperadores, hipermutación somática, selección negativa/tolerancia, complemento ni fagocitosis. No decir que el antígeno «elige al azar» como hecho biológico (el reconocimiento depende de complementariedad); el azar es la regla del sorteo, y puede aclararse así en un texto de pie.
-- Referencia: Burnet, F. M. (1959). *The clonal selection theory of acquired immunity*. Cambridge University Press. Texto de consulta: Murphy, K., & Weaver, C. (2022). *Janeway's immunobiology* (10.ª ed.). W. W. Norton.
+Cada **participante es un linfocito T virgen** que patrulla un ganglio linfático (con un TCR de especificidad única). Una **célula dendrítica** llega del tejido infectado con antígeno; el sorteo es el momento en que la célula dendrítica encuentra a UN linfocito, lo activa y este prolifera. **El libro no forma parte de la historia biológica.** El azar es la regla del sorteo («todos los participantes tienen la misma probabilidad»): no se afirma que la selección biológica sea azarosa; solo el *encuentro* se presenta como producto de la motilidad.
+
+Guion (≈ 30 s; E0 opcional +5 s; las rondas siguientes arrancan en E4 ≈ 16 s con el subtítulo «Una respuesta real es policlonal…»): **E0** elenco (frotis de sangre, Wright-Giemsa) · **E1** (5 s) epitelio roto, *Listeria*, macrófago residente, TLR y citocinas (inmunidad innata, minutos) · **E2** (5 s) neutrófilos: rodamiento, adhesión, diapédesis, fagocitosis, ROS y NET · **E3** (4 s) la célula dendrítica captura, madura y viaja por el vaso linfático · **E4** (5 s) el ganglio: la DC recorre linfocitos T vírgenes · **E5** (5 s) sinapsis inmunológica con las tres señales (TCR–MHC, CD28–CD80/86, citocinas); MHC II para CD4 / MHC I para CD8 · **E6** (7 s) proliferación con IL-2 y salida por la linfa eferente; final CD8 (perforina y granzimas, apoptosis de la célula infectada) o CD4 (IFN-γ y macrófago activado). Barra inferior «minutos → horas → días».
+
+Exactitud (criterios de aceptación): los **no elegidos no mueren ni se desvanecen** (siguen patrullando); la proporción CD4:CD8 (2:1) es **solo ilustrativa e independiente del sorteo**; tamaños relativos aproximados; tinciones Wright-Giemsa solo en células; **verde reservado al linfocito activado/ganador**; subtítulos de máx. 2 líneas y 18 palabras con `aria-live="polite"`; Canvas 2D vectorial, 30–60 fps con 100 participantes + ~40 de ambientación.
+- Registro: «{Nombre}, tu linfocito T virgen ya patrulla el ganglio linfático. Ahora solo queda esperar a que llegue la célula dendrítica.», con un linfocito que entra por una vénula de endotelio alto. Total de inscritos → «linfocitos T en el ganglio».
+- Vocabulario no permitido en este modo: nada de «clones en el repertorio», antígeno = libro, linfocitos B, ni presentarlo como selección clonal de Burnet (eso es del modo clásico).
+- Referencias: ver `FUENTES` en `js/contenido-cientifico.js` (Abbas 2022; Murphy y Weaver 2022; Banchereau y Steinman 1998; Kolaczkowska y Kubes 2013; Brinkmann 2004; Rosenberg 2013; Voehringer 2013; Jenkins y Moon 2012).
+
+### Modo clásico (`?modo=clasico`): selección clonal
+
+Burnet (1959): cada participante es un **linfocito B** con receptor (BCR) único; el **libro es el antígeno**; el antígeno **reconoce a un solo clon**, que se **expande**. Vocabulario: linfocito B, receptor (BCR), antígeno, reconocimiento, afinidad, clon, repertorio, expansión/proliferación clonal; sin mezclar con MHC, linfocitos T cooperadores, hipermutación, tolerancia, complemento ni fagocitosis. No decir que el antígeno «elige al azar» como hecho biológico. Referencia: Burnet, F. M. (1959). *The clonal selection theory of acquired immunity*. Cambridge University Press.
 
 ## Comandos
 
@@ -156,6 +166,8 @@ node tests/normalizar.test.mjs                      # normalización (sin depend
 node tests/azar.test.mjs                            # aleatoriedad (sin dependencias)
 node tests/sorteo-util.test.mjs                     # máscara, formato título y registro descargable (sin dependencias)
 node tests/login-errores.test.mjs                   # clasificación y mensajes de errores del login (sin dependencias)
+node tests/errores-guardado.test.mjs                # clasificación y mensajes de errores al guardar la ronda (sin dependencias)
+node tests/contenido-cientifico.test.mjs             # límites del contenido científico (sin dependencias)
 # Pruebas de reglas (requiere Java; ver README):
 npm i --no-save firebase-tools @firebase/rules-unit-testing firebase
 npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/reglas.emulador.mjs"

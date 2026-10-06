@@ -10,7 +10,7 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 2. En el panel → *Lista de la clase*: sube o pega un nombre por línea (se limpian viñetas, asteriscos, numeración y puntos finales), **revisa** la vista previa (total leído, los 3 primeros con la máscara, colisiones y líneas rechazadas) y guarda. Los nombres no pueden llevar `< > &` ni comillas (ni apóstrofos).
 3. Abre el registro (botón en el panel) y comparte `https://fungatec.github.io/sorteo_inmuno/`.
 4. En el panel, *Participantes* muestra el nombre oficial y avisa si lo tecleado difiere o no corresponde; *Alta manual* cubre a quien no pudo registrarse.
-5. En el evento: cierra el registro, abre *Ir al sorteo*, pulsa **F** (pantalla completa), haz un **ensayo** (casilla marcada) y luego los sorteos reales. *Volver a sortear* excluye a los ganadores previos. En pantalla sale una máscara `Nombre I. I.`; *Mostrar nombre completo* (tecla **N**) revela el nombre oficial.
+5. En el evento: cierra el registro, abre *Ir al sorteo*, pulsa **F** (pantalla completa), haz un **ensayo** (casilla marcada) y luego los sorteos reales. *Activar otro linfocito* (nueva ronda) excluye a los ganadores previos. En pantalla sale una máscara `Nombre I. I.`; *Mostrar nombre completo* (tecla **N**) revela el nombre oficial. Atajos: **Espacio** inicia, **S** salta de escena, **C** subtítulos, **I** ficha inmunológica, **F** pantalla completa, **N** nombre completo.
 6. **Al terminar el evento:** pulsa **Descargar registro del sorteo** (constancia en `.txt`) y después **Vaciar datos** en el panel (escribe `BORRAR`). Es lo que cumple el aviso de privacidad del registro («se eliminarán al terminar el evento»).
 
 ## Pasos manuales pendientes
@@ -34,6 +34,8 @@ node tests/normalizar.test.mjs        # normalización (sin dependencias)
 node tests/azar.test.mjs              # aleatoriedad del sorteo (sin dependencias)
 node tests/sorteo-util.test.mjs       # máscara, formato título y registro descargable (sin dependencias)
 node tests/login-errores.test.mjs     # errores del login (sin dependencias)
+node tests/errores-guardado.test.mjs  # errores al guardar la ronda (sin dependencias)
+node tests/contenido-cientifico.test.mjs  # límites del contenido científico (sin dependencias)
 ```
 
 Reglas con el emulador de Firestore (batches y `serverTimestamp` reales; requiere Java 11+):
@@ -45,8 +47,29 @@ npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/
 
 (Si `firebase.json` no existe, el emulador usa los puertos por defecto; pasa `--config` o crea uno con `{"firestore":{"rules":"firestore.rules"}}`.)
 
-De extremo a extremo (navegador real + emuladores de Auth y Firestore, 50 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
+De extremo a extremo (navegador real + emuladores de Auth y Firestore, 59 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
 
 ## Desarrollo local
 
 `python3 -m http.server 8000` y abrir `http://localhost:8000` (los módulos ES no funcionan con `file://`). Para que el login funcione en local, `localhost` ya figura entre los dominios autorizados de Firebase por defecto. Abrir `http://localhost:8000/?emulador` conecta a los emuladores locales (solo en `localhost`).
+
+## La animación del sorteo: respuesta inmune a *Listeria monocytogenes*
+
+**Regla:** todo texto de la interfaz debe ser biológicamente correcto; ante la duda, usa solo la sección «Contenido científico» (`js/contenido-cientifico.js`, fuente de verdad) y marca lo incierto con **[VERIFICAR]** aquí.
+
+Cada participante es un **linfocito T virgen** que patrulla un ganglio linfático; una **célula dendrítica** llega del tejido infectado con antígeno y activa a uno, que prolifera. El libro no forma parte de la historia biológica. Guion (≈ 30 s): E0 elenco opcional (frotis de sangre, +5 s) · E1 inmunidad innata en el tejido (epitelio roto, macrófago residente, TLR, citocinas) · E2 neutrófilos (rodamiento, adhesión, diapédesis, fagocitosis, ROS, NET) · E3 la célula dendrítica captura, madura y viaja al ganglio · E4 el ganglio: encuentro con linfocitos T vírgenes · E5 sinapsis inmunológica con tres señales (TCR–MHC, CD28–CD80/86, citocinas) · E6 proliferación con IL-2 y final CD8 (perforina y granzimas) o CD4 (IFN-γ y macrófago activado). Las rondas siguientes arrancan en E4 (≈ 16 s). Los participantes no elegidos **no mueren ni desaparecen**; la proporción CD4:CD8 (2:1) es solo ilustrativa y **independiente del sorteo**; el azar es la regla del sorteo (todos tienen la misma probabilidad), no una afirmación sobre la biología.
+
+**Plan B:** `https://fungatec.github.io/sorteo_inmuno/sorteo.html?modo=clasico` abre la animación anterior (selección clonal de linfocitos B, ≈ 11 s). El guardado de la ronda ocurre **antes** de revelar en ambos modos.
+
+**Puntos marcados [VERIFICAR] (revisar con la asesoría inmunológica antes del evento):**
+- [VERIFICAR] Frecuencia de precursores específicos de antígeno: del orden de 1 en 10^5–10^6 linfocitos T vírgenes (dato de la ficha).
+- [VERIFICAR] Escalas de la barra de tiempo («minutos → horas → días»): se reparte en tercios, de forma cualitativa.
+- [VERIFICAR] NET con *Listeria* como ejemplo de neutrófilo: la formación de NET se muestra como mecanismo general.
+- [VERIFICAR] Bacilos dibujados ×2,2 su tamaño relativo, por legibilidad.
+- [VERIFICAR] «Vénula poscapilar» como sitio de extravasación (el esquema no dibuja capilares).
+- [VERIFICAR] «El encuentro es al azar» se refiere solo a la motilidad del linfocito, no a la selección.
+- [VERIFICAR] El monocito de la ficha no lleva tamaño ni rasgo porque no figuraba en el contenido provisto.
+
+**Fuentes:** Abbas, A. K., Lichtman, A. H., & Pillai, S. (2022); Murphy, K., & Weaver, C. (2022), *Janeway's immunobiology* (10.ª ed.); Banchereau, J., & Steinman, R. M. (1998), *Nature* 392; Kolaczkowska, E., & Kubes, P. (2013), *Nat Rev Immunol* 13; Brinkmann, V. et al. (2004), *Science* 303; Rosenberg, H. F. et al. (2013); Voehringer, D. (2013); Jenkins, M. K., & Moon, J. J. (2012), *J Immunol* 188. Las referencias completas están en `FUENTES`.
+
+**Pruebas de la animación:** E2E con ronda real (3 participantes), 100 participantes (≈ 60 fps, revelación a ≈ 30 s), `prefers-reduced-motion` y modo clásico; auditoría axe sin violaciones (incluida la ficha).

@@ -51,7 +51,7 @@ form.addEventListener("submit", async (e) => {
     if (abierto === null) { aviso(msg, MENSAJE_RED, "error"); enviar.disabled = false; return; }
     const r = await crearParticipante({ nombre: nombre.value, correo: correo.value, origen: "registro" });
     form.hidden = true; $("#estado").hidden = true; $("#intro").hidden = true;
-    $("#listo-texto").textContent = `${limpiarNombre(r.nombre)}, tu receptor ya forma parte del repertorio. Ahora solo queda esperar el reconocimiento.`;
+    $("#listo-texto").textContent = `${limpiarNombre(r.nombre)}, tu linfocito T virgen ya patrulla el ganglio linfático. Ahora solo queda esperar a que llegue la célula dendrítica.`;
     $("#listo").hidden = false;
     $("#listo h1").focus();
     enviar.disabled = false;
@@ -62,7 +62,7 @@ form.addEventListener("submit", async (e) => {
     else aviso(msg, "Ocurrió un error inesperado. Inténtalo de nuevo; si persiste, avisa a la maestra.", "error");
     enviar.disabled = false;
   } finally {
-    enviar.textContent = "Inscribir mi clon";
+    enviar.textContent = "Inscribir mi linfocito";
   }
 });
 

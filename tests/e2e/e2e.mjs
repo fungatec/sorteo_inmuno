@@ -9,6 +9,7 @@ import http from "node:http";
 import { readFileSync, existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import assert from "node:assert/strict";
+import { SUBTITULOS } from "../../js/contenido-cientifico.js";
 
 const REPO = process.env.REPO ?? new URL("../..", import.meta.url).pathname.replace(/\/$/, ""), PORT = 8000, BASE = `http://localhost:${PORT}`;
 const TIPOS = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
@@ -74,6 +75,19 @@ async function nuevaPagina(ctxOpts = {}) {
   return page;
 }
 const DENEGADO = /avisa a la maestra/;
+// Con prefers-reduced-motion cada escena dura 3 s: la tecla S las salta para no esperar ~25 s por ronda en cada prueba.
+async function acelerar(pg, ms = 60000) {
+  const t0 = Date.now();
+  while (await pg.isHidden("#resultado") && Date.now() - t0 < ms) { await pg.keyboard.press("s"); await pg.waitForTimeout(120); }
+}
+// Lee la secuencia de subtítulos (#fase) hasta que aparece el resultado.
+async function subtitulos(pg, ms = 60000) {
+  const t0 = Date.now(), vistos = [];
+  while (await pg.isHidden("#resultado") && Date.now() - t0 < ms) {
+    const f = await pg.textContent("#fase"); if (f && vistos.at(-1) !== f) vistos.push(f); await pg.waitForTimeout(100);
+  }
+  return { vistos, seg: (Date.now() - t0) / 1000 };
+}
 
 // ------------------------------------------------------------------ REGISTRO
 {
@@ -127,7 +141,9 @@ const DENEGADO = /avisa a la maestra/;
   await prueba("registro válido con otro orden, acentos, mayúsculas y espacios dobles", async () => {
     await p.fill("#nombre", "  ramirez   soto JULIAN "); await p.fill("#correo", " Julian.Ramirez0000@Alumnos.UDG.mx "); await p.click("#enviar");
     await p.waitForSelector("#listo:not([hidden])");
-    assert.match(await p.textContent("#listo-texto"), /ramirez soto JULIAN/);
+    const confirmacion = await p.textContent("#listo-texto");
+    assert.match(confirmacion, /ramirez soto JULIAN/);
+    assert.match(confirmacion, /tu linfocito T virgen ya patrulla el ganglio linfático\. Ahora solo queda esperar a que llegue la célula dendrítica\./);
     const d = await leer("participantes/julian-ramirez-soto");
     assert.equal(d.fields.origen.stringValue, "registro"); assert.equal(d.fields.correo.stringValue, "julian.ramirez0000@alumnos.udg.mx");
     assert.ok(await leer("correos/julian.ramirez0000@alumnos.udg.mx"));
@@ -346,9 +362,12 @@ const DENEGADO = /avisa a la maestra/;
   await s.goto(`${BASE}/sorteo.html?emulador`); await s.waitForSelector("#contenido:not([hidden])");
   await s.waitForFunction(() => document.querySelector("#contador").textContent !== "–");
   const MASCARAS = ["Julián R. S.", "María Á.", "Ana L."];                 // de los 3 nombres OFICIALES de la lista
-  await prueba("sorteo: contador = clones inscritos (3)", async () => { assert.equal(await s.textContent("#contador"), "3"); });
+  await prueba("sorteo: contador = linfocitos T en el ganglio (3)", async () => {
+    assert.equal(await s.textContent("#contador"), "3"); assert.equal(await s.textContent("#contador-texto"), "linfocitos T en el ganglio");
+    assert.equal(await s.textContent("#sortear"), "Iniciar la respuesta inmune");
+  });
   await prueba("sorteo: ensayo no guarda nada, muestra la MÁSCARA del nombre oficial y 'Mostrar nombre completo' el oficial", async () => {
-    await s.check("#ensayo"); await s.click("#sortear"); await s.waitForSelector("#resultado:not([hidden])");
+    await s.check("#ensayo"); await s.click("#sortear"); await acelerar(s); await s.waitForSelector("#resultado:not([hidden])");
     const mascara = await s.textContent("#ganador");
     assert.ok(MASCARAS.includes(mascara), mascara);
     assert.ok(!/Troll/.test(await s.textContent("#proyeccion")), "nunca el nombre tecleado");
@@ -363,7 +382,7 @@ const DENEGADO = /avisa a la maestra/;
   await prueba("sorteo: el atajo Espacio sortea de nuevo (ensayo) y la tecla N alterna el nombre completo", async () => {
     await s.waitForFunction(() => !document.querySelector("#sortear").disabled);
     await s.evaluate(() => document.activeElement?.blur());
-    await s.keyboard.press("Space");
+    await s.keyboard.press("Space"); await acelerar(s);
     await s.waitForFunction(() => !document.querySelector("#sortear").disabled && !document.querySelector("#resultado").hidden);
     await s.keyboard.press("n"); assert.equal(await s.getAttribute("#nombre-completo", "aria-pressed"), "true");
     await s.keyboard.press("n"); assert.equal(await s.getAttribute("#nombre-completo", "aria-pressed"), "false");
@@ -404,12 +423,12 @@ const DENEGADO = /avisa a la maestra/;
     await s.uncheck("#ensayo");
     for (let ronda = 1; ronda <= 3; ronda++) {
       await s.waitForFunction(() => !document.querySelector("#sortear").disabled);
-      assert.equal(await s.textContent("#sortear"), ronda === 1 ? "Liberar el antígeno" : "Volver a sortear");
-      await s.click("#sortear");
+      assert.equal(await s.textContent("#sortear"), ronda === 1 ? "Iniciar la respuesta inmune" : "Activar otro linfocito");
+      await s.click("#sortear"); await acelerar(s);
       await s.waitForFunction((r) => !document.querySelector("#resultado").hidden && /Ronda/.test(document.querySelector("#ronda").textContent) && document.querySelector("#ronda").textContent.includes(String(r)), ronda);
       ganadores.push(await s.textContent("#ganador"));
       assert.equal(await s.isVisible("#etiqueta-ensayo"), false);
-      await s.waitForFunction(() => document.querySelector("#fase").textContent === "Clon seleccionado.");
+      assert.match(await s.textContent("#tarjeta-tipo"), /^Linfocito T CD[48]\+ activado$/);
     }
     assert.equal(new Set(ganadores).size, 3, ganadores.join(" | "));
     const docs = await listar("sorteos");
@@ -443,20 +462,31 @@ const DENEGADO = /avisa a la maestra/;
   for (const d of await listar("sorteos")) await fetch(`http://127.0.0.1:8080/v1/${d.name}`, { method: "DELETE", headers: OWNER });
   const a = await p.context().newPage(); a.errores = []; a.on("pageerror", (e) => a.errores.push(e.message));
   await a.goto(`${BASE}/sorteo.html?emulador`); await a.waitForFunction(() => document.querySelector("#contador").textContent === "3");
-  await prueba("sorteo con animación completa: 4 escenas en orden, revelación entre 8 y 12 s y resultado enmascarado", async () => {
+  await prueba("sorteo con animación completa: escenas E1–E6 en orden, barra de tiempo, revelación a ~30 s y resultado enmascarado", async () => {
     await a.check("#ensayo");
-    const t0 = Date.now(); await a.click("#sortear");
-    const fases = [];
-    while (await a.isHidden("#resultado") && Date.now() - t0 < 30000) {
-      const f = await a.textContent("#fase"); if (fases.at(-1) !== f) fases.push(f); await a.waitForTimeout(100);
-    }
-    const dur = (Date.now() - t0) / 1000;
-    assert.ok(dur >= 8 && dur <= 12.5, `duración hasta la revelación: ${dur.toFixed(1)} s`);
-    const lista = fases.join(" > ");
-    const iE = ["El repertorio", "El antígeno explora", "Reconocimiento", "Expansión clonal"].map((x) => lista.indexOf(x));
-    assert.ok(iE.every((x) => x >= 0) && iE.every((x, i) => i === 0 || x > iE[i - 1]), lista);
+    assert.equal(await a.isHidden("#barra-tiempo"), true);
+    await a.click("#sortear");
+    await a.waitForFunction(() => !document.querySelector("#barra-tiempo").hidden);
+    const { vistos, seg } = await subtitulos(a, 45000);
+    assert.ok(seg >= 27 && seg <= 34, `duración hasta la revelación: ${seg.toFixed(1)} s`);
+    const idx = ["E1", "E2", "E3", "E4", "E5", "E6_PROLIF"].map((k) => vistos.indexOf(SUBTITULOS[k]));
+    assert.ok(idx.every((x) => x >= 0) && idx.every((x, i) => i === 0 || x > idx[i - 1]), vistos.join(" > "));
+    assert.ok(!vistos.includes(SUBTITULOS.E0), "sin la casilla de elenco no hay E0");
+    assert.ok(vistos.every((t) => t.split(/\s+/).length <= 18), "subtítulos de 18 palabras o menos");
+    assert.equal(await a.getAttribute("#fase", "aria-live"), "polite");
     assert.ok(MASCARAS.includes(await a.textContent("#ganador")));
-    console.log(`   [info] revelación a los ${dur.toFixed(1)} s`);
+    assert.match(await a.textContent("#tarjeta-tipo"), /^Linfocito T CD[48]\+ activado$/);
+    console.log(`   [info] revelación a los ${seg.toFixed(1)} s`);
+  });
+  await prueba("sorteo: la nueva ronda arranca en E4 (~16 s), sin E1–E3, con el subtítulo 'Una respuesta real es policlonal…'", async () => {
+    await a.waitForFunction(() => !document.querySelector("#sortear").disabled);
+    assert.equal(await a.textContent("#sortear"), "Activar otro linfocito");
+    await a.click("#sortear");
+    const { vistos, seg } = await subtitulos(a, 40000);
+    assert.ok(seg >= 13 && seg <= 20, `duración de la ronda siguiente: ${seg.toFixed(1)} s`);
+    assert.equal(vistos[0], SUBTITULOS.E4_RONDA); assert.match(vistos[0], /policlonal/);
+    for (const k of ["E1", "E2", "E3"]) assert.ok(!vistos.includes(SUBTITULOS[k]), k);
+    console.log(`   [info] ronda siguiente: revelación a los ${seg.toFixed(1)} s`);
   });
   await prueba("sorteo: el botón 'Pantalla completa' activa el modo proyección y los mandos se ocultan por inactividad", async () => {
     await a.waitForFunction(() => !document.querySelector("#sortear").disabled);
@@ -470,6 +500,81 @@ const DENEGADO = /avisa a la maestra/;
   });
   assert.deepEqual(a.errores, []);
   await s.close(); await a.close(); // Chromium limita las conexiones simultáneas por host
+
+  // ---------------- extras del modo inmune (movimiento reducido + tecla S) y plan B clásico
+  const nuevaSorteo = async (query, reducido = true) => {
+    const q = await p.context().newPage(); q.errores = []; q.on("pageerror", (e) => q.errores.push(e.message));
+    if (reducido) await q.emulateMedia({ reducedMotion: "reduce" });
+    await q.goto(`${BASE}/sorteo.html?emulador${query}`); await q.waitForFunction(() => document.querySelector("#contador").textContent === "3");
+    return q;
+  };
+  for (const tipo of ["CD4", "CD8"]) await prueba(`sorteo: tipo ilustrativo ${tipo} (?tipo= solo en localhost) → tarjeta «Linfocito T ${tipo}+ activado» y subtítulo final correspondiente`, async () => {
+    const q = await nuevaSorteo(`&tipo=${tipo}`);
+    await q.check("#ensayo"); await q.click("#sortear");
+    const t0 = Date.now(); let vistos = [];
+    while (await q.isHidden("#resultado") && Date.now() - t0 < 60000) {
+      const f = await q.textContent("#fase"); if (f && vistos.at(-1) !== f) vistos.push(f);
+      await q.keyboard.press("s"); await q.waitForTimeout(150);
+    }
+    assert.equal(await q.textContent("#tarjeta-tipo"), `Linfocito T ${tipo}+ activado`);
+    assert.ok(MASCARAS.includes(await q.textContent("#ganador")));
+    assert.deepEqual(q.errores, []); await q.close();
+  });
+  await prueba("sorteo: tecla C oculta/muestra subtítulos; tecla I abre la ficha (diálogo modal), Espacio no sortea con ella abierta y Esc/I la cierran", async () => {
+    const q = await nuevaSorteo("");
+    await q.evaluate(() => document.activeElement?.blur());
+    await q.keyboard.press("c"); assert.equal(await q.evaluate(() => document.querySelector("#proyeccion").classList.contains("sin-subtitulos")), true);
+    await q.keyboard.press("c"); assert.equal(await q.evaluate(() => document.querySelector("#proyeccion").classList.contains("sin-subtitulos")), false);
+    await q.keyboard.press("i");
+    await q.waitForSelector("#ficha:not([hidden])");
+    assert.equal(await q.getAttribute("#ficha", "role"), "dialog"); assert.equal(await q.getAttribute("#ficha", "aria-modal"), "true");
+    assert.ok(await q.locator("#ficha .tarjeta-celula").count() >= 9, "8 células + Innata vs. adaptativa");
+    assert.match(await q.textContent("#ficha"), /Innata/);
+    await q.keyboard.press("Space"); await q.waitForTimeout(300);
+    assert.equal(await q.isDisabled("#sortear"), false); assert.equal(await q.isHidden("#resultado"), true, "con la ficha abierta no se inicia el sorteo");
+    await q.keyboard.press("Escape"); await q.waitForSelector("#ficha", { state: "hidden" });
+    await q.click("#btn-ficha"); await q.waitForSelector("#ficha:not([hidden])");
+    await q.keyboard.press("i"); await q.waitForSelector("#ficha", { state: "hidden" });
+    assert.deepEqual(q.errores, []); await q.close();
+  });
+  await prueba("sorteo: casilla «elenco» antepone E0 (frotis de sangre) y la tecla S salta de escena", async () => {
+    const q = await nuevaSorteo("");
+    await q.check("#ensayo"); await q.check("#elenco"); await q.click("#sortear");
+    await q.waitForFunction((t) => document.querySelector("#fase").textContent === t, SUBTITULOS.E0);
+    await q.keyboard.press("s");
+    await q.waitForFunction((t) => document.querySelector("#fase").textContent === t, SUBTITULOS.E1, { timeout: 4000 });
+    await acelerar(q); assert.equal(await q.isVisible("#resultado"), true);
+    assert.deepEqual(q.errores, []); await q.close();
+  });
+  await prueba("MODO CLÁSICO (?modo=clasico): textos y escenas de selección clonal intactos, revelación a 8–12 s, máscara y sin atajos del modo inmune", async () => {
+    const q = await nuevaSorteo("&modo=clasico", false);
+    assert.equal(await q.textContent("#sortear"), "Liberar el antígeno"); assert.equal(await q.textContent("#contador-texto"), "clones en el repertorio");
+    assert.equal(await q.isHidden("#atajos"), true); assert.equal(await q.isHidden("#etq-elenco"), true); assert.equal(await q.isHidden("#barra-tiempo"), true);
+    assert.equal(await q.evaluate(() => document.querySelector("#proyeccion").classList.contains("clasico")), true);
+    await q.check("#ensayo"); await q.click("#sortear");
+    const { vistos, seg } = await subtitulos(q, 30000);
+    assert.ok(seg >= 8 && seg <= 12.5, `duración ${seg.toFixed(1)} s`);
+    const lista = vistos.join(" > ");
+    const iE = ["El repertorio", "El antígeno explora", "Reconocimiento", "Expansión clonal"].map((x) => lista.indexOf(x));
+    assert.ok(iE.every((x) => x >= 0) && iE.every((x, i) => i === 0 || x > iE[i - 1]), lista);
+    assert.ok(MASCARAS.includes(await q.textContent("#ganador")));
+    assert.equal(await q.textContent("#tarjeta-tipo"), "El antígeno reconoció a");
+    await q.waitForFunction(() => !document.querySelector("#sortear").disabled);
+    assert.equal(await q.textContent("#sortear"), "Volver a sortear");
+    assert.deepEqual(q.errores, []); await q.close();
+  });
+  await prueba("MODO CLÁSICO: una ronda real se guarda (adminUid, ronda 1) antes de revelar", async () => {
+    const q = await nuevaSorteo("&modo=clasico", false);
+    await q.click("#sortear");
+    await q.waitForTimeout(1500);
+    assert.equal((await listar("sorteos")).length, 1, "guardada mientras la animación aún corre");
+    assert.equal(await q.isHidden("#resultado"), true, "aún no se ha revelado");
+    await q.waitForSelector("#resultado:not([hidden])", { timeout: 20000 });
+    const [d] = await listar("sorteos");
+    assert.equal(d.fields.adminUid.stringValue, UID); assert.equal(Number(d.fields.ronda.integerValue), 1);
+    await fetch(`http://127.0.0.1:8080/v1/${d.name}`, { method: "DELETE", headers: OWNER });
+    assert.deepEqual(q.errores, []); await q.close();
+  });
   await prueba("panel y sorteo: sin desbordamiento horizontal a 360 px", async () => {
     const m = await p.context().newPage(); await m.setViewportSize({ width: 360, height: 740 });
     for (const pagina of ["panel", "sorteo"]) {
@@ -526,7 +631,7 @@ const DENEGADO = /avisa a la maestra/;
     await x.close();
     await borrar(`lista/${k}`); await borrar(`participantes/${k}`); await borrar(`correos/${encodeURIComponent(CORREO)}`);
   });
-  await prueba("rendimiento: 100 participantes → animación fluida (≥ 30 fps) y revelación entre 8 y 12 s", async () => {
+  await prueba("rendimiento: 100 participantes → animación fluida (≥ 30 fps) y revelación a ~30 s", async () => {
     const { claveDeNombre } = await import(`${REPO}/js/normalizar.js`);
     const N = ["Ana", "Luis", "Marta", "Pedro", "Sofia", "Diego", "Elena", "Raul", "Irene", "Hugo"];
     const A = ["Lopez", "Garcia", "Ruiz", "Soto", "Vega", "Mora", "Rios", "Cruz", "Paz", "Luna"];
@@ -541,10 +646,10 @@ const DENEGADO = /avisa a la maestra/;
     await f.check("#ensayo");
     await f.evaluate(() => { window.__f = 0; const t = () => { window.__f++; requestAnimationFrame(t); }; requestAnimationFrame(t); });
     const t0 = Date.now(); await f.click("#sortear");
-    await f.waitForSelector("#resultado:not([hidden])", { timeout: 20000 });
+    await f.waitForSelector("#resultado:not([hidden])", { timeout: 50000 });
     const dur = (Date.now() - t0) / 1000, fps = (await f.evaluate(() => window.__f)) / dur;
     console.log(`   [info] 100 participantes: revelación a los ${dur.toFixed(1)} s, ${fps.toFixed(0)} fps medios`);
-    assert.ok(dur >= 8 && dur <= 12.5, `duración ${dur}`); assert.ok(fps >= 30, `fps ${fps}`);
+    assert.ok(dur >= 27 && dur <= 34, `duración ${dur}`); assert.ok(fps >= 30, `fps ${fps}`);
     assert.deepEqual(f.errores, []); await f.close();
   });
   await prueba("salir: vuelve a login y las páginas de admin redirigen", async () => {

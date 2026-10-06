@@ -33,7 +33,7 @@ Necesitas: un celular **con datos móviles** (no la Wi-Fi del evento), una lapto
 2. [ ] **Lista de prueba:** Panel → Lista de la clase → pega 6 nombres ficticios en MAYÚSCULAS y sin acentos, algunos con viñeta o punto final (`• ANA PEREZ-GIL.`), uno con partícula (`ROSA DE LOS RIOS MORA`), y uno repetido con otro orden → *Revisar lista*. Comprueba el total leído, que la vista previa muestre los 3 primeros con la máscara (`Ana P. G.`…), que detecte la colisión y que **no** la guarde. Guarda y confirma en Firestore que el nombre quedó **sin** viñeta ni punto.
 3. [ ] **Abrir el registro** (interruptor del panel).
 4. [ ] **En el celular** abre el enlace de Pages y prueba:
-   - [ ] Registro válido con un nombre de la lista (otro orden, sin acentos) y un correo `@alumnos.udg.mx` → ves «Tu clon quedó en el repertorio».
+   - [ ] Registro válido con un nombre de la lista (otro orden, sin acentos) y un correo `@alumnos.udg.mx` → ves «{Nombre}, tu linfocito T virgen ya patrulla el ganglio linfático…» con la animación del linfocito cruzando la vénula.
    - [ ] Correo `@gmail.com` → «El correo debe ser @alumnos.udg.mx» (sin enviar).
    - [ ] Nombre que no está en la lista → mensaje único («No pudimos completar tu registro…»).
    - [ ] Repetir el mismo nombre → mismo mensaje único.
@@ -42,10 +42,11 @@ Necesitas: un celular **con datos móviles** (no la Wi-Fi del evento), una lapto
    - [ ] Tamaño de pantalla pequeño: nada se corta ni hay desplazamiento horizontal.
 5. [ ] **Cerrar el registro** en el panel → recarga el celular: «El registro está cerrado».
 6. [ ] **Panel:** *Participantes* muestra el **nombre oficial**; si alguien tecleó distinto sale «escrito distinto»; la búsqueda encuentra sin acentos; *Alta manual* agrega a alguien aunque esté cerrado; *Eliminar* lo quita.
-7. [ ] **Sorteo (ensayo):** `sorteo.html` → marca *Ensayo* → *Liberar el antígeno*.
-   - [ ] Dura entre 8 y 12 s, con las 4 escenas; sale una **máscara en formato título** (`Marta E. R. V. S.`), no el nombre completo.
+7. [ ] **Sorteo (ensayo):** `sorteo.html` → marca *Ensayo* → *Iniciar la respuesta inmune*.
+   - [ ] Dura ~30 s (escenas E1–E6, subtítulos de ≤ 18 palabras y barra «minutos → horas → días»); la tecla **S** salta de escena, **C** oculta los subtítulos, **I** abre la ficha inmunológica. Sale una **máscara en formato título** (`Marta E. R. V. S.`), no el nombre completo.
    - [ ] *Mostrar nombre completo* (o tecla **N**) muestra el nombre **oficial** de la lista en formato título (`Marta Elena Rios y Vega Soto`).
-   - [ ] *Volver a sortear* (o **Espacio**) elige a otra persona.
+   - [ ] *Activar otro linfocito* (o **Espacio**) elige a otra persona; la nueva ronda arranca en la escena E4 (~16 s) con el subtítulo «Una respuesta real es policlonal…».
+   - [ ] **Plan B:** abre `sorteo.html?modo=clasico` y comprueba que la animación anterior (≈ 11 s, «Liberar el antígeno» / «Volver a sortear») funciona. Úsala si el proyector o el equipo no mueven bien la animación nueva.
    - [ ] **Pantalla completa** (tecla **F**) en la laptop y, si hay, en el proyector: se ve nítido, los botones se ocultan a los 3 s y reaparecen al mover el ratón.
 8. [ ] **Sorteo real de prueba:** desmarca *Ensayo*, sortea una vez → en Firestore aparece `sorteos/…` con `fecha`, `totalParticipantes`, `ganadorClave`, `ronda`, `adminUid`.
 9. [ ] **Descargar registro del sorteo** (Panel, «Al terminar el evento») → abre el `.txt`: fecha, ronda, total y ganador con nombre oficial.
@@ -57,7 +58,7 @@ Necesitas: un celular **con datos móviles** (no la Wi-Fi del evento), una lapto
 - [ ] Carga la **lista real** en el panel (desde tu laptop; no la guardes en el repositorio). Revisa colisiones.
 - [ ] Abre el registro; comparte el enlace. Vigila *Participantes* y las advertencias.
 - [ ] **Cierra el registro** antes del sorteo. Haz un **ensayo** (casilla marcada) con el proyector.
-- [ ] Sorteo real: **desmarca Ensayo**. Si el ganador no está presente: *Volver a sortear*.
+- [ ] Sorteo real: **desmarca Ensayo**. Si el ganador no está presente: *Activar otro linfocito*.
 - [ ] Al terminar: **Descargar registro del sorteo** → **Vaciar datos** (`BORRAR`).
 
 ## E · Si algo falla

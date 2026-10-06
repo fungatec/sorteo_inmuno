@@ -14,17 +14,18 @@
   <main>
     <div id="intro">
       <svg class="marca" viewBox="0 0 64 64" aria-hidden="true">
-      <g stroke="#053043" stroke-width="2.5" stroke-linecap="round" fill="none">
-        <path d="M32 14V6M32 6l-4-4M32 6l4-4"/>
-        <path d="M32 14V6M32 6l-4-4M32 6l4-4" transform="rotate(90 32 32)"/>
-        <path d="M32 14V6M32 6l-4-4M32 6l4-4" transform="rotate(180 32 32)"/>
-        <path d="M32 14V6M32 6l-4-4M32 6l4-4" transform="rotate(270 32 32)"/>
+      <g stroke="#053043" stroke-width="2.2" stroke-linecap="round" fill="#053043">
+        <g transform="rotate(0 32 32)"><path d="M32 15V9" fill="none"/><circle cx="32" cy="6.8" r="2.6" stroke="none"/></g>
+        <g transform="rotate(72 32 32)"><path d="M32 15V9" fill="none"/><circle cx="32" cy="6.8" r="2.6" stroke="none"/></g>
+        <g transform="rotate(144 32 32)"><path d="M32 15V9" fill="none"/><circle cx="32" cy="6.8" r="2.6" stroke="none"/></g>
+        <g transform="rotate(216 32 32)"><path d="M32 15V9" fill="none"/><circle cx="32" cy="6.8" r="2.6" stroke="none"/></g>
+        <g transform="rotate(288 32 32)"><path d="M32 15V9" fill="none"/><circle cx="32" cy="6.8" r="2.6" stroke="none"/></g>
       </g>
       <circle cx="32" cy="32" r="17" fill="#A7F0F3" stroke="#053043" stroke-width="2.5"/>
-      <circle cx="32" cy="32" r="7" fill="#053043"/>
+      <circle cx="32" cy="32" r="12.5" fill="#43398a"/>
     </svg>
-    <h1>Registra tu receptor</h1>
-    <p class="lead">Cada linfocito B porta un receptor de especificidad única. Inscribe el tuyo para entrar al repertorio del sorteo del libro de Inmunobiología.</p>
+    <h1>Inscribe tu linfocito T</h1>
+    <p class="lead">Cada linfocito T virgen porta un receptor (TCR) único y patrulla los ganglios linfáticos. Inscribe el tuyo para el sorteo del libro de Inmunobiología.</p>
     </div>
 
     <p class="estado-registro" id="estado" aria-live="polite"><span class="punto" id="punto"></span><span id="estado-texto">Consultando…</span></p>
@@ -48,33 +49,26 @@
       <input id="correo" name="correo" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="100" required placeholder="nombre.apellido@alumnos.udg.mx" aria-describedby="correo-ayuda correo-error">
       <p class="error-campo" id="correo-error" hidden></p>
 
-      <button type="submit" id="enviar">Inscribir mi clon</button>
+      <button type="submit" id="enviar">Inscribir mi linfocito</button>
       <p class="privacidad">Tus datos se usan solo para este sorteo y se eliminarán al terminar el evento.</p>
     </form>
 
     <section id="listo" class="clon-ok" hidden>
-      <svg class="repertorio" viewBox="0 0 260 150" role="img" aria-label="Un nuevo linfocito B se incorpora al repertorio">
-        <defs>
-          <g id="cel">
-            <g stroke="#053043" stroke-width="2" stroke-linecap="round" fill="none">
-              <path d="M0-12v-7M0-19l-3-3M0-19l3-3"/>
-              <path d="M0-12v-7M0-19l-3-3M0-19l3-3" transform="rotate(90)"/>
-              <path d="M0-12v-7M0-19l-3-3M0-19l3-3" transform="rotate(180)"/>
-              <path d="M0-12v-7M0-19l-3-3M0-19l3-3" transform="rotate(270)"/>
-            </g>
-            <circle r="12" style="fill:var(--c,#A7F0F3)" stroke="#053043" stroke-width="2"/>
-            <circle r="4.5" fill="#053043"/>
-          </g>
-        </defs>
-        <g class="existentes">
-          <use href="#cel" x="34" y="105"/><use href="#cel" x="82" y="105"/>
-          <use href="#cel" x="178" y="105"/><use href="#cel" x="226" y="105"/>
-          <use href="#cel" x="58" y="58"/><use href="#cel" x="106" y="58"/>
-          <use href="#cel" x="154" y="58"/><use href="#cel" x="202" y="58"/>
+      <svg class="repertorio" viewBox="0 0 260 150" role="img" aria-label="Un linfocito T virgen cruza la pared de una vénula de endotelio alto y se suma a los demás linfocitos del ganglio">
+        <defs><g id="lin"><circle r="11" fill="#A7F0F3" stroke="#053043" stroke-width="1.6"/><circle r="7.8" fill="#43398a"/></g></defs>
+        <rect x="-10" y="-6" width="280" height="46" fill="#7a2f3d" opacity=".6"/>
+        <g fill="#d98d86"><circle cx="34" cy="18" r="6"/><circle cx="78" cy="26" r="6"/><circle cx="188" cy="16" r="6"/><circle cx="226" cy="26" r="6"/></g>
+        <g fill="#bf7d98" stroke="#8e4a63" stroke-width="1.4">
+          <rect x="-8" y="40" width="40" height="24" rx="9"/><rect x="38" y="40" width="40" height="24" rx="9"/><rect x="84" y="40" width="26" height="24" rx="9"/>
+          <rect x="150" y="40" width="26" height="24" rx="9"/><rect x="182" y="40" width="40" height="24" rx="9"/><rect x="228" y="40" width="40" height="24" rx="9"/>
         </g>
-        <g transform="translate(130 105)"><g class="nuevo"><use href="#cel" style="--c:#45AC4D"/></g></g>
+        <g class="existentes">
+          <use href="#lin" x="30" y="96"/><use href="#lin" x="78" y="122"/><use href="#lin" x="182" y="122"/><use href="#lin" x="232" y="96"/>
+          <use href="#lin" x="54" y="130"/><use href="#lin" x="208" y="132"/><use href="#lin" x="96" y="92"/><use href="#lin" x="166" y="92"/>
+        </g>
+        <g transform="translate(130 108)"><g class="nuevo-t"><use href="#lin"/><circle r="14.5" fill="none" stroke="#25A9E0" stroke-width="2.4"/></g></g>
       </svg>
-      <h1 tabindex="-1">Tu clon quedó en el repertorio</h1>
+      <h1 tabindex="-1">Tu linfocito T ya está en el ganglio</h1>
       <p class="lead" id="listo-texto"></p>
     </section>
 

@@ -33,20 +33,26 @@
       <p class="fase" id="fase" aria-live="polite"></p>
       <div class="resultado" id="resultado" hidden aria-live="polite">
         <span class="etiqueta-ensayo" id="etiqueta-ensayo" hidden>ENSAYO · no se guarda</span>
-        <p class="suave">El antígeno reconoció a</p>
+        <p class="suave" id="tarjeta-tipo">El antígeno reconoció a</p>
         <h1 class="ganador-nombre" id="ganador"></h1>
       </div>
+      </div>
+      <div class="barra-tiempo" id="barra-tiempo" hidden aria-hidden="true">
+        <span class="tramo">minutos</span><span class="tramo">horas</span><span class="tramo">días</span>
+        <i class="relleno" id="barra-tiempo-relleno"></i>
       </div>
       <div class="mandos" id="mandos">
         <button type="button" id="sortear" disabled>Liberar el antígeno</button>
         <button type="button" class="secundario" id="nombre-completo" hidden aria-pressed="false">Mostrar nombre completo</button>
+        <button type="button" class="secundario" id="btn-ficha" aria-haspopup="dialog">Ficha inmunológica (I)</button>
         <button type="button" class="secundario" id="pantalla-completa">Pantalla completa</button>
       </div>
     </section>
 
     <div class="opciones">
       <label class="check"><input type="checkbox" id="ensayo"> Ensayo (no se guarda ni excluye a nadie definitivamente)</label>
-      <p class="suave atajos">Atajos: <kbd>Espacio</kbd> sortear · <kbd>F</kbd> pantalla completa · <kbd>N</kbd> nombre completo</p>
+      <label class="check" id="etq-elenco"><input type="checkbox" id="elenco"> Mostrar primero el elenco: células de un frotis de sangre (+5 s)</label>
+      <p class="suave atajos" id="atajos">Atajos: <kbd>Espacio</kbd> inicia · <kbd>S</kbd> salta de escena · <kbd>C</kbd> subtítulos · <kbd>F</kbd> pantalla completa · <kbd>N</kbd> nombre completo · <kbd>I</kbd> ficha inmunológica</p>
     </div>
 
     <details id="previos" hidden>
@@ -54,7 +60,7 @@
       <ol id="lista-previos"></ol>
     </details>
 
-    <p class="suave" style="margin-top:2rem;font-size:.8rem">Cada clon tiene la misma probabilidad: el azar lo define la regla del sorteo (generador criptográfico del navegador), no la inmunología. En pantalla se muestra el nombre oficial de la lista, abreviado.</p>
+    <p class="suave" id="nota-pie" style="margin-top:2rem;font-size:.8rem">Todos los participantes tienen la misma probabilidad (sorteo con el generador criptográfico del navegador). La escena es una ilustración didáctica. En pantalla se muestra el nombre oficial de la lista, abreviado.</p>
   </main>
   <script type="module" src="js/sorteo.js"></script>
 </body>
