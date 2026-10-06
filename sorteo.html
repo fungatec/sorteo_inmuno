@@ -19,35 +19,42 @@
     </nav>
   </header>
 
-  <main id="contenido" hidden>
+  <main id="contenido" class="ancho" hidden>
     <div id="aviso" class="aviso" hidden></div>
 
-    <p class="suave" id="ronda">Ronda 1</p>
-    <p class="contador" id="contador" aria-live="polite">–</p>
-    <p id="contador-texto">clones en el repertorio</p>
-    <p class="suave" id="excluidos" hidden></p>
-
-    <div id="campo" class="campo" aria-hidden="true"></div>
-    <p class="fase" id="fase" aria-live="polite"></p>
-    <div id="expansion" class="expansion" aria-hidden="true"></div>
-
-    <section id="resultado" hidden aria-live="polite">
-      <span class="etiqueta-ensayo" id="etiqueta-ensayo" hidden>ENSAYO · no se guarda</span>
-      <p class="suave">El antígeno reconoció a</p>
-      <h1 class="ganador-nombre" id="ganador"></h1>
+    <section id="proyeccion" class="proyeccion" aria-label="Escena del sorteo">
+      <div class="caja">
+      <canvas id="lienzo" aria-hidden="true"></canvas>
+      <div class="hud-sup">
+        <span class="suave" id="ronda">Ronda 1</span>
+        <p class="contador" id="contador" aria-live="polite">–</p>
+        <span id="contador-texto">clones en el repertorio</span>
+      </div>
+      <p class="fase" id="fase" aria-live="polite"></p>
+      <div class="resultado" id="resultado" hidden aria-live="polite">
+        <span class="etiqueta-ensayo" id="etiqueta-ensayo" hidden>ENSAYO · no se guarda</span>
+        <p class="suave">El antígeno reconoció a</p>
+        <h1 class="ganador-nombre" id="ganador"></h1>
+      </div>
+      </div>
+      <div class="mandos" id="mandos">
+        <button type="button" id="sortear" disabled>Liberar el antígeno</button>
+        <button type="button" class="secundario" id="nombre-completo" hidden aria-pressed="false">Mostrar nombre completo</button>
+        <button type="button" class="secundario" id="pantalla-completa">Pantalla completa</button>
+      </div>
     </section>
 
-    <div class="fila-botones" style="justify-content:center">
-      <button type="button" id="sortear" disabled>Liberar el antígeno</button>
+    <div class="opciones">
+      <label class="check"><input type="checkbox" id="ensayo"> Ensayo (no se guarda ni excluye a nadie definitivamente)</label>
+      <p class="suave atajos">Atajos: <kbd>Espacio</kbd> sortear · <kbd>F</kbd> pantalla completa · <kbd>N</kbd> nombre completo</p>
     </div>
-    <p style="margin-top:1rem"><label class="check"><input type="checkbox" id="ensayo"> Ensayo (no se guarda ni excluye ganadores)</label></p>
 
     <details id="previos" hidden>
       <summary>Ganadores de rondas anteriores</summary>
       <ol id="lista-previos"></ol>
     </details>
 
-    <p class="suave" style="margin-top:2.5rem;font-size:.8rem">Cada clon tiene la misma probabilidad: el azar lo define la regla del sorteo (generador criptográfico del navegador), no la inmunología.</p>
+    <p class="suave" style="margin-top:2rem;font-size:.8rem">Cada clon tiene la misma probabilidad: el azar lo define la regla del sorteo (generador criptográfico del navegador), no la inmunología. En pantalla se muestra el nombre oficial de la lista, abreviado.</p>
   </main>
   <script type="module" src="js/sorteo.js"></script>
 </body>

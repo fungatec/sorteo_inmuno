@@ -1,24 +1,43 @@
-// Pantalla del sorteo: selección clonal. El libro es el antígeno; cada participante, un linfocito B.
-// El ganador se elige y (si no es ensayo) se guarda ANTES de la animación: si no se pudo guardar,
-// no se revela a nadie. Se muestra siempre el nombre OFICIAL (lista/{clave}), nunca el tecleado.
+// Pantalla del sorteo / modo proyección. Selección clonal: cada participante es un linfocito B,
+// el libro es el antígeno. Reglas de oro (ver CLAUDE.md):
+//  - el ganador sale de crypto.getRandomValues con muestreo por rechazo (js/azar.js), nunca Math.random;
+//  - se elige y se GUARDA antes de animar: si no se pudo guardar, no se revela a nadie;
+//  - en pantalla solo aparece el nombre OFICIAL (lista/{clave}.nombre), abreviado; nunca el tecleado.
 import { configPendiente } from "./firebase.js";
 import { requerirAdmin, cerrarSesion } from "./auth.js";
 import { leerColeccion, guardarSorteo } from "./datos.js";
 import { enteroAleatorio } from "./azar.js";
+import { crearEscena, FRASES } from "./escena.js";
+import { enmascararNombre } from "./sorteo-util.js";
 import { $, h, aviso, avisoConfigPendiente } from "./ui.js";
 
-const MAX_PUNTOS = 240;
-const msg = $("#aviso"), campo = $("#campo"), fase = $("#fase"), expansion = $("#expansion"), boton = $("#sortear");
-const espera = (ms) => new Promise((r) => setTimeout(r, ms));
-const sinMovimiento = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const msg = $("#aviso"), proyeccion = $("#proyeccion"), boton = $("#sortear"), btnNombre = $("#nombre-completo");
+const btnPantalla = $("#pantalla-completa"), ensayoChk = $("#ensayo");
 
-let participantes = [], oficiales = new Map(), sorteos = [], ocupado = false, revelado = false;
+let participantes = [], oficiales = new Map(), sorteos = [], ocupado = false;
+let actual = null;                       // { p, oficial, mascara, ensayo } del último ganador revelado
+const ensayoGanadores = new Set();       // en ensayo se excluyen entre sí solo durante esta sesión de pantalla
+
+const escena = crearEscena($("#lienzo"), { semilla: enteroAleatorio(2 ** 32) });
+const movimientoReducido = matchMedia("(prefers-reduced-motion: reduce)");
+escena.setReducido(movimientoReducido.matches);
+movimientoReducido.addEventListener("change", (e) => escena.setReducido(e.matches));
+escena.alFase((texto) => { $("#fase").textContent = texto; });
+escena.alRevelar(() => mostrarResultado());
+
+// ------------------------------------------------------------------ datos
+const nombreOficial = (p) => oficiales.get(p.id) ?? p.nombre;
+const ganadoresPrevios = () => new Set(sorteos.map((s) => s.ganadorClave));
+function elegibles() {
+  const g = ganadoresPrevios();
+  return participantes.filter((p) => !g.has(p.id) && !(ensayoChk.checked && ensayoGanadores.has(p.id)));
+}
 
 async function cargar() {
   try {
     const [p, l, s] = await Promise.all([leerColeccion("participantes"), leerColeccion("lista"), leerColeccion("sorteos")]);
     participantes = p; oficiales = new Map(l.map((x) => [x.id, x.nombre]));
-    sorteos = s.sort((a, b) => a.ronda - b.ronda || (a.fecha?.seconds ?? 0) - (b.fecha?.seconds ?? 0));
+    sorteos = s.sort((a, b) => a.ronda - b.ronda);
     aviso(msg, "");
   } catch {
     aviso(msg, "No se pudieron leer los participantes. Revisa tu conexión y recarga la página.", "error");
@@ -27,93 +46,114 @@ async function cargar() {
   preparar();
 }
 
-const nombreOficial = (p) => oficiales.get(p.id) ?? p.nombre;
-const ganadoresPrevios = () => new Set(sorteos.map((s) => s.ganadorClave));
-const elegibles = () => { const g = ganadoresPrevios(); return participantes.filter((p) => !g.has(p.id)); };
-
-/** Deja la pantalla lista para una nueva ronda. */
+// ------------------------------------------------------------------ estado de la pantalla
+/** Deja la escena en reposo (Escena 1) con un clon por participante elegible. */
 function preparar() {
-  revelado = false;
+  actual = null;
   const pool = elegibles();
-  $("#ronda").textContent = `Ronda ${sorteos.length + 1}`;
+  escena.establecerClones(pool.length);
+  $("#ronda").textContent = ensayoChk.checked ? "Ensayo" : `Ronda ${sorteos.length + 1}`;
   $("#contador").textContent = pool.length;
   $("#contador-texto").textContent = pool.length === 1 ? "clon en el repertorio" : "clones en el repertorio";
-  const excl = participantes.length - pool.length;
-  $("#excluidos").hidden = !excl;
-  $("#excluidos").textContent = `${excl} ganador(es) de rondas anteriores excluido(s)`;
-  $("#resultado").hidden = true; expansion.replaceChildren(); fase.textContent = "";
-  campo.replaceChildren(...Array.from({ length: Math.min(pool.length, MAX_PUNTOS) }, () => h("span", { class: "clon" })));
-  boton.textContent = "Liberar el antígeno"; boton.disabled = pool.length === 0;
-  if (!pool.length) aviso(msg, "No hay clones elegibles. Revisa el panel: debe haber participantes inscritos.", "aviso");
-  const previos = $("#lista-previos");
-  previos.replaceChildren(...sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${oficiales.get(s.ganadorClave) ?? s.ganadorClave}`)));
-  $("#previos").hidden = !sorteos.length;
+  $("#resultado").hidden = true; btnNombre.hidden = true; btnNombre.setAttribute("aria-pressed", "false");
+  btnNombre.textContent = "Mostrar nombre completo";
+  $("#fase").textContent = pool.length ? FRASES[0] : "";
+  boton.textContent = sorteos.length || ensayoGanadores.size ? "Volver a sortear" : "Liberar el antígeno";
+  boton.disabled = pool.length === 0 || ocupado;
+  if (!pool.length) aviso(msg, participantes.length
+    ? "No quedan clones elegibles: todos los participantes ya fueron ganadores." : "No hay participantes inscritos. Revisa el panel.", "aviso");
+  const previos = sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${oficiales.get(s.ganadorClave) ?? s.ganadorClave}`));
+  $("#lista-previos").replaceChildren(...previos); $("#previos").hidden = !previos.length;
 }
 
-boton.addEventListener("click", async () => {
-  if (ocupado) return;
-  if (revelado) { preparar(); return; } // "Otra ronda": solo reinicia la escena
-  ocupado = true; boton.disabled = true; aviso(msg, "");
-  const ensayo = $("#ensayo").checked;
-  const pool = elegibles();
-  const ganador = pool[enteroAleatorio(pool.length)];
-  const ronda = sorteos.length + 1;
+function mostrarResultado() {
+  if (!actual) return;
+  $("#ganador").textContent = actual.mascara;
+  $("#etiqueta-ensayo").hidden = !actual.ensayo;
+  $("#resultado").hidden = false; btnNombre.hidden = false;
+}
 
-  if (!ensayo) {
-    try {
-      const id = await guardarSorteo({ totalParticipantes: pool.length, ganadorClave: ganador.id, ronda });
-      sorteos.push({ id, ganadorClave: ganador.id, ronda });
-    } catch {
-      aviso(msg, "No se pudo guardar el sorteo, así que no se reveló a nadie. Revisa tu conexión e inténtalo de nuevo.", "error");
-      ocupado = false; boton.disabled = false; return;
-    }
-  }
-  await animar(pool.length <= MAX_PUNTOS ? pool.indexOf(ganador) : enteroAleatorio(campo.children.length));
-  $("#ganador").textContent = nombreOficial(ganador);
-  $("#etiqueta-ensayo").hidden = !ensayo;
-  $("#resultado").hidden = false;
-  fase.textContent = "Expansión clonal completada.";
-  revelado = true; ocupado = false; boton.disabled = false;
-  boton.textContent = "Otra ronda";
-  if (!ensayo) { $("#ronda").textContent = `Ronda ${ronda} · guardada`; pintarPrevios(); }
+btnNombre.addEventListener("click", () => {
+  if (!actual) return;
+  const completo = btnNombre.getAttribute("aria-pressed") !== "true";
+  btnNombre.setAttribute("aria-pressed", String(completo));
+  btnNombre.textContent = completo ? "Ocultar nombre completo" : "Mostrar nombre completo";
+  $("#ganador").textContent = completo ? actual.oficial : actual.mascara;
 });
 
-function pintarPrevios() {
-  $("#lista-previos").replaceChildren(...sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${oficiales.get(s.ganadorClave) ?? s.ganadorClave}`)));
-  $("#previos").hidden = false;
+ensayoChk.addEventListener("change", () => { if (ocupado) { ensayoChk.checked = !ensayoChk.checked; return; } ensayoGanadores.clear(); preparar(); });
+
+// ------------------------------------------------------------------ sorteo
+async function sortear() {
+  if (ocupado || boton.disabled) return;
+  ocupado = true; boton.disabled = true; btnNombre.hidden = true; aviso(msg, "");
+  $("#resultado").hidden = true; escena.reiniciar();
+
+  const ensayo = ensayoChk.checked, pool = elegibles();
+  if (!pool.length) { ocupado = false; preparar(); return; }
+  const indice = enteroAleatorio(pool.length);       // ← la elección (crypto + muestreo por rechazo)
+  const p = pool[indice], ronda = sorteos.length + 1;
+
+  if (!ensayo) {                                     // guardar ANTES de revelar
+    try {
+      const id = await guardarSorteo({ totalParticipantes: pool.length, ganadorClave: p.id, ronda });
+      sorteos.push({ id, ganadorClave: p.id, ronda });
+    } catch {
+      aviso(msg, "No se pudo guardar el sorteo, así que no se reveló a nadie. Revisa tu conexión e inténtalo de nuevo.", "error");
+      ocupado = false; preparar(); return;
+    }
+  } else ensayoGanadores.add(p.id);
+
+  const oficial = nombreOficial(p);
+  actual = { p, oficial, mascara: enmascararNombre(oficial), ensayo };
+  if (!oficiales.has(p.id)) aviso(msg, "El ganador no está en la lista oficial: se usó el nombre capturado en el alta manual.", "aviso");
+
+  escena.establecerClones(pool.length);               // un clon por participante elegible de esta ronda
+  $("#contador").textContent = pool.length;
+  $("#ronda").textContent = ensayo ? "Ensayo" : `Ronda ${ronda}`;
+  await escena.reproducir(escena.indiceVisual(indice, pool.length, enteroAleatorio));
+
+  ocupado = false;
+  const quedan = elegibles().length;
+  boton.textContent = "Volver a sortear"; boton.disabled = quedan === 0;
+  if (!quedan) aviso(msg, "Ya no quedan clones elegibles para otra ronda.", "aviso");
+  mostrarResultado(); $("#fase").textContent = "Clon seleccionado.";
+  if (!ensayo) $("#lista-previos").replaceChildren(...sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${oficiales.get(s.ganadorClave) ?? s.ganadorClave}`)));
+  $("#previos").hidden = !sorteos.length;
 }
+boton.addEventListener("click", sortear);
 
-/** Animación: acercamiento del antígeno → reconocimiento de un clon → proliferación clonal. */
-async function animar(indiceGanador) {
-  const puntos = [...campo.children];
-  if (sinMovimiento() || !puntos.length) { puntos[indiceGanador]?.classList.add("ganador"); return; }
+// ------------------------------------------------------------------ pantalla completa y atajos
+const puedePantalla = !!proyeccion.requestFullscreen;
+btnPantalla.hidden = !puedePantalla;
+const alternarPantalla = () => {
+  if (!puedePantalla) return;
+  if (document.fullscreenElement) document.exitFullscreen(); else proyeccion.requestFullscreen().catch(() => {});
+};
+btnPantalla.addEventListener("click", alternarPantalla);
 
-  fase.textContent = "El antígeno se acerca al repertorio…";
-  await espera(1400);
-
-  fase.textContent = "Reconocimiento: el antígeno busca el receptor complementario…";
-  let previo = null, pausa = 70;
-  for (let i = 0; i < 26; i++) {
-    previo?.classList.remove("reconocido");
-    previo = puntos[enteroAleatorio(puntos.length)];
-    previo.classList.add("reconocido");
-    await espera(pausa); pausa = Math.min(pausa * 1.12, 320);
-  }
-  previo?.classList.remove("reconocido");
-  const elegido = puntos[indiceGanador];
-  elegido.classList.add("reconocido");
-  await espera(900);
-
-  fase.textContent = "Activación: el clon reconocido prolifera.";
-  puntos.forEach((p) => { if (p !== elegido) p.classList.add("apagado"); });
-  elegido.classList.remove("reconocido"); elegido.classList.add("ganador");
-  for (let i = 0; i < 14; i++) { expansion.append(h("i", {})); await espera(110); }
-  await espera(600);
+let temporizador = 0;
+function despertar() {
+  proyeccion.classList.remove("inactivo");
+  clearTimeout(temporizador);
+  if (document.fullscreenElement) temporizador = setTimeout(() => proyeccion.classList.add("inactivo"), 3000);
 }
+["mousemove", "pointerdown", "touchstart", "keydown"].forEach((ev) => document.addEventListener(ev, despertar, { passive: true }));
+document.addEventListener("fullscreenchange", () => {
+  btnPantalla.textContent = document.fullscreenElement ? "Salir de pantalla completa" : "Pantalla completa";
+  despertar();
+});
 
-// ---- arranque (al final: usa todo lo anterior)
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey || e.target.closest?.("input, textarea, select")) return;
+  // Espacio/Enter ya activan de forma nativa los botones, enlaces y resúmenes enfocados.
+  if ((e.key === " " || e.key === "Enter") && !e.target.closest?.("button, summary, a")) { e.preventDefault(); sortear(); }
+  else if (e.key === "f" || e.key === "F") alternarPantalla();
+  else if ((e.key === "n" || e.key === "N") && !btnNombre.hidden) btnNombre.click();
+});
+
+// ---------------------------------------------------------------- arranque (al final: usa todo lo anterior)
 $("#salir").addEventListener("click", cerrarSesion);
-
 if (configPendiente) {
   $("#contenido").hidden = false; avisoConfigPendiente($("#contenido"));
 } else {

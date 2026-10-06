@@ -44,9 +44,24 @@ Cuerpo base de un participante (`creadoEn` = `request.time`):
 | 10 | **delete** `/sorteos/x` — sin autenticar | — | **Denegado** |
 | 11 | **delete** `/sorteos/x` — autenticado como admin (UID `i0y2lNrbtRed5L7dTIUFTLSKeQr1`) | — | **Permitido** (solo se usa en «Vaciar datos») |
 | 12 | **update** `/sorteos/x` — admin | cualquier cambio | **Denegado** |
+| 13 | **create** `/sorteos/nuevo` — admin, con `fecha`=`request.time`, `totalParticipantes`=1, `ganadorClave` de un participante que exista, `ronda`=1 y `adminUid` = su UID | — | **Permitido** |
+| 14 | Igual que 13 pero `adminUid` distinto del UID de la sesión, o sin `adminUid` | — | **Denegado** |
+| 15 | **create** `/sorteos/nuevo` — sin autenticar o usuario no-admin | como 13 | **Denegado** |
 
 Casos extra recomendados: campo adicional (`x:1`) → Denegado; `origen:"admin"` sin ser admin → Denegado; `nombre` de 4 caracteres → Denegado; `update` o `delete` de un participante sin ser admin → Denegado.
 
 ## Limpieza
 
 Borra `lista/prueba-*`, `participantes/prueba-*`, `correos/*prueba*`, `correos/fuera.lista@…` y confirma que `config/estado` queda como corresponda.
+
+## Equivalencia con los casos del Paso 1 en la suite del emulador (`tests/reglas.emulador.mjs`, 46 casos)
+
+| Caso del Paso 1 | Prueba del emulador (resultado esperado) |
+|---|---|
+| Nombre en la lista | «público: registro válido (nombre en lista)» → permitido |
+| Nombre fuera de la lista | «público: nombre fuera de lista» → denegado |
+| Correo @gmail | «público: correo @gmail» → denegado |
+| Duplicado por nombre | «público: duplicado por nombre» → denegado |
+| Duplicado por correo | «público: duplicado por correo» → denegado |
+| Registro cerrado | «registro cerrado: público no puede registrarse» → denegado; el admin sí puede dar de alta |
+| No-admin leyendo `participantes` | «público: no lee participantes/…» y «no-admin autenticado: no lee participantes» → denegado; además, «no pueden LISTAR la colección …» para `lista`, `participantes`, `correos`, `sorteos`, `config` y `admins` |

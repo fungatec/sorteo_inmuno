@@ -8,6 +8,7 @@ import {
 import {
   analizarLista, claveDeNombre, compararConOficial, mensajeErrorNombre, mensajeErrorCorreo, normalizarCorreo,
 } from "./normalizar.js";
+import { textoRegistroSorteo, nombreArchivoRegistro } from "./sorteo-util.js";
 import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo } from "./ui.js";
 
 const msg = $("#aviso");
@@ -202,6 +203,26 @@ $("#form-alta").addEventListener("submit", async (e) => {
   }
   btn.disabled = false;
 });
+
+// ------------------------------------------------------------------ constancia del sorteo (archivo de texto)
+async function descargarRegistro() {
+  let sorteos;
+  try { sorteos = await leerColeccion("sorteos"); }
+  catch { aviso(msg, "No se pudo leer el registro del sorteo. Revisa tu conexión.", "error"); return false; }
+  if (!sorteos.length) { aviso(msg, "Todavía no hay sorteos guardados (los ensayos no se registran).", "aviso"); return false; }
+  const nombreDe = (clave) => {
+    const o = oficial(clave);
+    return o ? { nombre: o, oficial: true } : { nombre: participantes.find((p) => p.id === clave)?.nombre ?? clave, oficial: false };
+  };
+  const texto = textoRegistroSorteo({ sorteos, nombreDe });
+  const enlace = h("a", { href: URL.createObjectURL(new Blob([texto], { type: "text/plain;charset=utf-8" })), download: nombreArchivoRegistro() });
+  document.body.append(enlace); enlace.click(); enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(enlace.href), 10000);
+  aviso(msg, `Registro descargado (${sorteos.length} ronda(s)): ${nombreArchivoRegistro()}`, "exito");
+  return true;
+}
+$("#descargar-registro").addEventListener("click", descargarRegistro);
+$("#descargar-registro-dlg").addEventListener("click", descargarRegistro);
 
 // ------------------------------------------------------------------ vaciar datos (doble confirmación)
 const dlg = $("#dlg-vaciar"), texto = $("#confirmar-texto"), confirmar = $("#confirmar-vaciar");

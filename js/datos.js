@@ -2,7 +2,7 @@
 import {
   collection, doc, getDoc, getDocs, setDoc, writeBatch, serverTimestamp, deleteDoc,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { db } from "./firebase.js";
+import { db, auth } from "./firebase.js";
 import { claveDeNombre, limpiarNombre, validarNombre, normalizarCorreo, esCorreoValido, DOMINIO_CORREO } from "./normalizar.js";
 
 /** true/false, o null si no se pudo leer (sin red, config pendiente…). */
@@ -66,7 +66,8 @@ export async function guardarLista(entradas) {
 /** Guarda un sorteo (las reglas exigen fecha = hora del servidor y ganador existente). */
 export async function guardarSorteo({ totalParticipantes, ganadorClave, ronda }) {
   const ref = doc(collection(db, "sorteos"));
-  await setDoc(ref, { fecha: serverTimestamp(), totalParticipantes, ganadorClave, ronda });
+  const adminUid = auth.currentUser?.uid; // las reglas exigen que coincida con la sesión
+  await setDoc(ref, { fecha: serverTimestamp(), totalParticipantes, ganadorClave, ronda, adminUid });
   return ref.id;
 }
 

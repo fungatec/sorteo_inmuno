@@ -26,6 +26,7 @@ const CONFIG_TEST = `export const firebaseConfig = { apiKey:"fake-key", authDoma
 export const ADMIN_USUARIO = "admin123"; export const ADMIN_CORREO = "admin@admin.admin";`;
 
 // ---- datos semilla vía REST (el token "owner" salta las reglas en el emulador)
+const PASS = "t-" + globalThis.crypto.randomUUID();   // cuenta de prueba efímera del emulador
 const FS = "http://127.0.0.1:8080/v1/projects/sorteoinmuno/databases/(default)/documents";
 const OWNER = { Authorization: "Bearer owner", "Content-Type": "application/json" };
 const val = (v) => v instanceof Date ? { timestampValue: v.toISOString() } : typeof v === "boolean" ? { booleanValue: v } : { stringValue: v };
@@ -39,11 +40,11 @@ async function listar(col) { const r = await fetch(`${FS}/${col}`, { headers: OW
 await fetch("http://127.0.0.1:8080/emulator/v1/projects/sorteoinmuno/databases/(default)/documents", { method: "DELETE" });
 await fetch("http://127.0.0.1:9099/emulator/v1/projects/sorteoinmuno/accounts", { method: "DELETE" });
 const reg = await (await fetch("http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-key",
-  { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "admin@admin.admin", password: "Clave-De-Prueba-9", returnSecureToken: true }) })).json();
+  { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: "admin@admin.admin", password: PASS, returnSecureToken: true }) })).json();
 const UID = reg.localId; assert.ok(UID);
 await sembrar(`admins/${UID}`, { activo: true });
 await sembrar("config/estado", { registroAbierto: true });
-await sembrar("lista/gomez-jonathan-peregrina", { nombre: "Jonathan Gómez Peregrina" });
+await sembrar("lista/julian-ramirez-soto", { nombre: "Julián Ramírez Soto" });
 await sembrar("lista/angeles-maria", { nombre: "María de los Ángeles Ruiz".replace(" Ruiz", "") });
 await sembrar("lista/lopez-ana", { nombre: "Ana López" });
 
@@ -73,7 +74,7 @@ const DENEGADO = /avisa a la maestra/;
     assert.match(await p.textContent(".privacidad"), /solo para este sorteo y se eliminarán al terminar el evento/);
   });
   await prueba("registro: validación en vivo (correo @gmail) y se corrige sola", async () => {
-    await p.fill("#nombre", "Jonathan Gómez Peregrina");
+    await p.fill("#nombre", "Julián Ramírez Soto");
     await p.fill("#correo", "jon@gmail.com"); await p.press("#correo", "Tab");
     assert.equal(await p.textContent("#correo-error"), "El correo debe ser @alumnos.udg.mx");
     assert.equal(await p.getAttribute("#correo", "aria-invalid"), "true");
@@ -99,20 +100,20 @@ const DENEGADO = /avisa a la maestra/;
     assert.equal(await p.isDisabled("#enviar"), false);
   });
   await prueba("registro válido con otro orden, acentos, mayúsculas y espacios dobles", async () => {
-    await p.fill("#nombre", "  gomez   peregrina JONATHAN "); await p.fill("#correo", " Jonathan.Gomez4016@Alumnos.UDG.mx "); await p.click("#enviar");
+    await p.fill("#nombre", "  ramirez   soto JULIAN "); await p.fill("#correo", " Julian.Ramirez0000@Alumnos.UDG.mx "); await p.click("#enviar");
     await p.waitForSelector("#listo:not([hidden])");
-    assert.match(await p.textContent("#listo-texto"), /gomez peregrina JONATHAN/);
-    const d = await leer("participantes/gomez-jonathan-peregrina");
-    assert.equal(d.fields.origen.stringValue, "registro"); assert.equal(d.fields.correo.stringValue, "jonathan.gomez4016@alumnos.udg.mx");
-    assert.ok(await leer("correos/jonathan.gomez4016@alumnos.udg.mx"));
+    assert.match(await p.textContent("#listo-texto"), /ramirez soto JULIAN/);
+    const d = await leer("participantes/julian-ramirez-soto");
+    assert.equal(d.fields.origen.stringValue, "registro"); assert.equal(d.fields.correo.stringValue, "julian.ramirez0000@alumnos.udg.mx");
+    assert.ok(await leer("correos/julian.ramirez0000@alumnos.udg.mx"));
   });
   const p2 = await nuevaPagina(); await p2.goto(`${BASE}/index.html?emulador`);
   await prueba("registro: duplicado por nombre → mensaje único", async () => {
-    await p2.fill("#nombre", "Jonathan Gómez Peregrina"); await p2.fill("#correo", "otro@alumnos.udg.mx"); await p2.click("#enviar");
+    await p2.fill("#nombre", "Julián Ramírez Soto"); await p2.fill("#correo", "otro@alumnos.udg.mx"); await p2.click("#enviar");
     await p2.waitForFunction(() => /No pudimos completar/.test(document.querySelector("#aviso").textContent));
   });
   await prueba("registro: duplicado por correo → mensaje único", async () => {
-    await p2.fill("#nombre", "Ana López"); await p2.fill("#correo", "jonathan.gomez4016@alumnos.udg.mx"); await p2.click("#enviar");
+    await p2.fill("#nombre", "Ana López"); await p2.fill("#correo", "julian.ramirez0000@alumnos.udg.mx"); await p2.click("#enviar");
     await p2.waitForFunction(() => /No pudimos completar/.test(document.querySelector("#aviso").textContent));
     assert.equal(await leer("participantes/lopez-ana"), null);
   });
@@ -134,12 +135,12 @@ const DENEGADO = /avisa a la maestra/;
 {
   const p = await nuevaPagina(); await p.goto(`${BASE}/login.html?emulador`);
   await prueba("login: usuario 'admin' (no admin123) se rechaza SIN llamar a Firebase", async () => {
-    await p.fill("#usuario", "admin"); await p.fill("#contrasena", "Clave-De-Prueba-9"); await p.click("#entrar");
+    await p.fill("#usuario", "admin"); await p.fill("#contrasena", PASS); await p.click("#entrar");
     await p.waitForFunction(() => /incorrectos/.test(document.querySelector("#aviso").textContent));
     assert.equal(p.authCalls, 0);
   });
   await prueba("login: correo directo 'admin@admin.admin' tampoco se acepta", async () => {
-    await p.fill("#usuario", "admin@admin.admin"); await p.fill("#contrasena", "Clave-De-Prueba-9"); await p.click("#entrar");
+    await p.fill("#usuario", "admin@admin.admin"); await p.fill("#contrasena", PASS); await p.click("#entrar");
     await p.waitForFunction(() => /incorrectos/.test(document.querySelector("#aviso").textContent));
     assert.equal(p.authCalls, 0);
   });
@@ -150,7 +151,7 @@ const DENEGADO = /avisa a la maestra/;
   });
   await prueba("login: cuenta sin documento en admins/ → 'Sin permisos de administrador' y sesión cerrada", async () => {
     await fetch(`${FS}/admins/${UID}`, { method: "DELETE", headers: OWNER });
-    await p.fill("#usuario", "admin123"); await p.fill("#contrasena", "Clave-De-Prueba-9"); await p.click("#entrar");
+    await p.fill("#usuario", "admin123"); await p.fill("#contrasena", PASS); await p.click("#entrar");
     await p.waitForFunction(() => /Sin permisos de administrador/.test(document.querySelector("#aviso").textContent));
     assert.match(p.url(), /login\.html/);
     await p.goto(`${BASE}/panel.html?emulador`); await p.waitForURL(/login\.html/);   // no quedó sesión
@@ -158,7 +159,7 @@ const DENEGADO = /avisa a la maestra/;
     await p.goto(`${BASE}/login.html?emulador`);
   });
   await prueba("login: admin123 + contraseña correcta → panel", async () => {
-    await p.fill("#usuario", " Admin123 "); await p.fill("#contrasena", "Clave-De-Prueba-9"); await p.click("#entrar");
+    await p.fill("#usuario", " Admin123 "); await p.fill("#contrasena", PASS); await p.click("#entrar");
     await p.waitForURL(/panel\.html/);
   });
   assert.deepEqual(p.errores, []);
@@ -168,7 +169,7 @@ const DENEGADO = /avisa a la maestra/;
 {
   const ctxPage = await nuevaPagina();
   const p = ctxPage; await p.goto(`${BASE}/login.html?emulador`);
-  await p.fill("#usuario", "admin123"); await p.fill("#contrasena", "Clave-De-Prueba-9"); await p.click("#entrar");
+  await p.fill("#usuario", "admin123"); await p.fill("#contrasena", PASS); await p.click("#entrar");
   await p.waitForURL(/panel\.html/); await p.waitForSelector("#contenido:not([hidden])");
   // participante manipulado: clave de Ana López con nombre arbitrario (lo siembra 'owner', como lo haría un cliente malicioso)
   await sembrar("participantes/lopez-ana", { nombre: "Troll Cualquiera", clave: "lopez-ana", correo: "troll@alumnos.udg.mx", origen: "registro", creadoEn: new Date() });
@@ -184,7 +185,7 @@ const DENEGADO = /avisa a la maestra/;
   });
   await prueba("panel: muestra nombre OFICIAL y advierte 'escrito distinto'", async () => {
     const t = await p.textContent("#participantes");
-    assert.match(t, /Jonathan Gómez Peregrina/); assert.match(t, /escrito distinto/); assert.match(t, /Tecleó: «gomez peregrina JONATHAN»/);
+    assert.match(t, /Julián Ramírez Soto/); assert.match(t, /escrito distinto/); assert.match(t, /Tecleó: «ramirez soto JULIAN»/);
   });
   await prueba("panel: advertencia fuerte 'no corresponde' (nombre manipulado)", async () => {
     const t = await p.textContent("#participantes");
@@ -226,7 +227,7 @@ const DENEGADO = /avisa a la maestra/;
     await p.uncheck("#solo-alertas");
   });
   await prueba("panel: búsqueda sin acentos ni mayúsculas, con contador", async () => {
-    await p.fill("#buscar", "GOMEZ");
+    await p.fill("#buscar", "RAMIREZ");
     assert.equal(await p.locator("#participantes tr").count(), 1);
     assert.match(await p.textContent("#contador-tabla"), /Mostrando 1 de 4/);
     await p.fill("#buscar", "alumnos.udg"); assert.equal(await p.locator("#participantes tr").count(), 4);
@@ -254,57 +255,98 @@ const DENEGADO = /avisa a la maestra/;
   assert.deepEqual(p.errores, [], "errores JS en panel: " + p.errores);
 
   // ---------------- SORTEO (movimiento reducido para ir rápido) + una corrida con animación completa
+  await prueba("panel: 'Descargar registro del sorteo' sin sorteos guardados avisa y no descarga", async () => {
+    await p.click("#descargar-registro");
+    await p.waitForFunction(() => /Todavía no hay sorteos guardados/.test(document.querySelector("#aviso").textContent));
+  });
   const s = await p.context().newPage(); s.errores = []; s.on("pageerror", (e) => s.errores.push(e.message));
   await s.emulateMedia({ reducedMotion: "reduce" });
   await s.goto(`${BASE}/sorteo.html?emulador`); await s.waitForSelector("#contenido:not([hidden])");
   await s.waitForFunction(() => document.querySelector("#contador").textContent !== "–");
+  const MASCARAS = ["Julián R. S.", "María Á.", "Ana L."];                 // de los 3 nombres OFICIALES de la lista
   await prueba("sorteo: contador = clones inscritos (3)", async () => { assert.equal(await s.textContent("#contador"), "3"); });
-  await prueba("sorteo: ensayo no guarda nada y muestra nombre OFICIAL", async () => {
+  await prueba("sorteo: ensayo no guarda nada, muestra la MÁSCARA del nombre oficial y 'Mostrar nombre completo' el oficial", async () => {
     await s.check("#ensayo"); await s.click("#sortear"); await s.waitForSelector("#resultado:not([hidden])");
-    const nombre = await s.textContent("#ganador");
-    assert.ok(["Jonathan Gómez Peregrina", "María de los Ángeles", "Ana López"].includes(nombre), nombre);
-    assert.notEqual(nombre, "Troll Cualquiera");
+    const mascara = await s.textContent("#ganador");
+    assert.ok(MASCARAS.includes(mascara), mascara);
+    assert.ok(!/Troll/.test(await s.textContent("#proyeccion")), "nunca el nombre tecleado");
+    assert.ok(!/\d{3}/.test(mascara), "la máscara no lleva dígitos");
     assert.equal((await listar("sorteos")).length, 0);
     assert.equal(await s.isVisible("#etiqueta-ensayo"), true);
+    await s.click("#nombre-completo");
+    const completo = await s.textContent("#ganador");
+    assert.ok(["Julián Ramírez Soto", "María de los Ángeles", "Ana López"].includes(completo), completo);
+    await s.click("#nombre-completo"); assert.equal(await s.textContent("#ganador"), mascara);
+  });
+  await prueba("sorteo: el atajo Espacio sortea de nuevo (ensayo) y la tecla N alterna el nombre completo", async () => {
+    await s.waitForFunction(() => !document.querySelector("#sortear").disabled);
+    await s.evaluate(() => document.activeElement?.blur());
+    await s.keyboard.press("Space");
+    await s.waitForFunction(() => !document.querySelector("#sortear").disabled && !document.querySelector("#resultado").hidden);
+    await s.keyboard.press("n"); assert.equal(await s.getAttribute("#nombre-completo", "aria-pressed"), "true");
+    await s.keyboard.press("n"); assert.equal(await s.getAttribute("#nombre-completo", "aria-pressed"), "false");
   });
   const ganadores = [];
-  await prueba("sorteo real: guarda ronda 1, excluye ganadores en rondas siguientes y nunca repite", async () => {
+  await prueba("sorteo real: guarda ronda, adminUid, excluye previos con 'Volver a sortear' y nunca repite", async () => {
     await s.uncheck("#ensayo");
     for (let ronda = 1; ronda <= 3; ronda++) {
-      if ((await s.textContent("#sortear")) === "Otra ronda") { await s.click("#sortear"); await s.waitForSelector("#resultado", { state: "hidden" }); }
-      assert.equal(await s.textContent("#sortear"), "Liberar el antígeno");
+      await s.waitForFunction(() => !document.querySelector("#sortear").disabled);
+      assert.equal(await s.textContent("#sortear"), ronda === 1 ? "Liberar el antígeno" : "Volver a sortear");
       await s.click("#sortear");
-      await s.waitForSelector("#resultado:not([hidden])");
+      await s.waitForFunction((r) => !document.querySelector("#resultado").hidden && /Ronda/.test(document.querySelector("#ronda").textContent) && document.querySelector("#ronda").textContent.includes(String(r)), ronda);
       ganadores.push(await s.textContent("#ganador"));
       assert.equal(await s.isVisible("#etiqueta-ensayo"), false);
+      await s.waitForFunction(() => document.querySelector("#fase").textContent === "Clon seleccionado.");
     }
-    await s.click("#sortear"); await s.waitForSelector("#resultado", { state: "hidden" });
     assert.equal(new Set(ganadores).size, 3, ganadores.join(" | "));
     const docs = await listar("sorteos");
     assert.equal(docs.length, 3);
-    const rondas = docs.map((d) => Number(d.fields.ronda.integerValue)).sort();
-    assert.deepEqual(rondas, [1, 2, 3]);
-    const totales = docs.map((d) => Number(d.fields.totalParticipantes.integerValue)).sort();
-    assert.deepEqual(totales, [1, 2, 3]);
+    assert.deepEqual(docs.map((d) => Number(d.fields.ronda.integerValue)).sort(), [1, 2, 3]);
+    assert.deepEqual(docs.map((d) => Number(d.fields.totalParticipantes.integerValue)).sort(), [1, 2, 3]);
+    for (const d of docs) assert.equal(d.fields.adminUid.stringValue, UID, "adminUid = UID de la sesión");
     assert.equal(await s.isDisabled("#sortear"), true); // sin elegibles
+  });
+  await prueba("panel: 'Descargar registro del sorteo' genera el archivo con fecha, ronda, total y nombre OFICIAL", async () => {
+    const [descarga] = await Promise.all([p.waitForEvent("download"), p.click("#descargar-registro")]);
+    assert.match(descarga.suggestedFilename(), /^registro-sorteo-\d{4}-\d{2}-\d{2}\.txt$/);
+    const { readFile } = await import("node:fs/promises");
+    const txt = await readFile(await descarga.path(), "utf8");
+    for (const f of ["Rondas registradas: 3", "Ronda 1", "Ronda 2", "Ronda 3", "Fecha:", "Total de participantes en la ronda: 3",
+      "Total de participantes en la ronda: 1", `UID del admin): ${UID}`]) assert.ok(txt.includes(f), f);
+    const oficiales = ["Julián Ramírez Soto", "María de los Ángeles", "Ana López"];
+    for (const o of oficiales) assert.ok(txt.includes(`Ganador (nombre oficial): ${o}`), o);
+    assert.ok(!txt.includes("Troll"), "nunca el nombre tecleado");
   });
   assert.deepEqual(s.errores, [], "errores JS en sorteo: " + s.errores);
 
   // corrida con animación completa (sin reduced-motion)
-  await fetch("http://127.0.0.1:8080/emulator/v1/projects/sorteoinmuno/databases/(default)/documents/sorteos", { method: "DELETE" }).catch(() => {});
   for (const d of await listar("sorteos")) await fetch(`http://127.0.0.1:8080/v1/${d.name}`, { method: "DELETE", headers: OWNER });
   const a = await p.context().newPage(); a.errores = []; a.on("pageerror", (e) => a.errores.push(e.message));
   await a.goto(`${BASE}/sorteo.html?emulador`); await a.waitForFunction(() => document.querySelector("#contador").textContent === "3");
-  await prueba("sorteo con animación completa: fases en orden y revela a un clon", async () => {
-    await a.check("#ensayo"); await a.click("#sortear");
-    const fases = new Set();
-    const t0 = Date.now();
-    while (await a.isHidden("#resultado") && Date.now() - t0 < 30000) { fases.add(await a.textContent("#fase")); await a.waitForTimeout(150); }
-    const lista = [...fases].join(" > ");
-    assert.match(lista, /antígeno se acerca/); assert.match(lista, /Reconocimiento/); assert.match(lista, /prolifera/);
-    assert.equal(await a.locator("#expansion i").count(), 14);
-    assert.equal(await a.locator(".clon.ganador").count(), 1);
-    assert.equal(await a.locator(".clon.apagado").count(), 2);
+  await prueba("sorteo con animación completa: 4 escenas en orden, revelación entre 8 y 12 s y resultado enmascarado", async () => {
+    await a.check("#ensayo");
+    const t0 = Date.now(); await a.click("#sortear");
+    const fases = [];
+    while (await a.isHidden("#resultado") && Date.now() - t0 < 30000) {
+      const f = await a.textContent("#fase"); if (fases.at(-1) !== f) fases.push(f); await a.waitForTimeout(100);
+    }
+    const dur = (Date.now() - t0) / 1000;
+    assert.ok(dur >= 8 && dur <= 12.5, `duración hasta la revelación: ${dur.toFixed(1)} s`);
+    const lista = fases.join(" > ");
+    const iE = ["El repertorio", "El antígeno explora", "Reconocimiento", "Expansión clonal"].map((x) => lista.indexOf(x));
+    assert.ok(iE.every((x) => x >= 0) && iE.every((x, i) => i === 0 || x > iE[i - 1]), lista);
+    assert.ok(MASCARAS.includes(await a.textContent("#ganador")));
+    console.log(`   [info] revelación a los ${dur.toFixed(1)} s`);
+  });
+  await prueba("sorteo: el botón 'Pantalla completa' activa el modo proyección y los mandos se ocultan por inactividad", async () => {
+    await a.waitForFunction(() => !document.querySelector("#sortear").disabled);
+    await a.click("#pantalla-completa");
+    await a.waitForFunction(() => document.fullscreenElement?.id === "proyeccion");
+    await a.mouse.move(10, 10); await a.waitForTimeout(3400);
+    assert.equal(await a.evaluate(() => document.querySelector("#proyeccion").classList.contains("inactivo")), true);
+    await a.mouse.move(40, 40);
+    assert.equal(await a.evaluate(() => document.querySelector("#proyeccion").classList.contains("inactivo")), false);
+    await a.keyboard.press("f"); await a.waitForFunction(() => !document.fullscreenElement);
   });
   assert.deepEqual(a.errores, []);
   await s.close(); await a.close(); // Chromium limita las conexiones simultáneas por host
@@ -334,6 +376,27 @@ const DENEGADO = /avisa a la maestra/;
     await w.close();
   });
   // cerrar sesión
+  await prueba("rendimiento: 100 participantes → animación fluida (≥ 30 fps) y revelación entre 8 y 12 s", async () => {
+    const { claveDeNombre } = await import(`${REPO}/js/normalizar.js`);
+    const N = ["Ana", "Luis", "Marta", "Pedro", "Sofia", "Diego", "Elena", "Raul", "Irene", "Hugo"];
+    const A = ["Lopez", "Garcia", "Ruiz", "Soto", "Vega", "Mora", "Rios", "Cruz", "Paz", "Luna"];
+    const B = ["Alba", "Bravo", "Campos", "Duran", "Ibarra", "Lara", "Nava", "Ortiz", "Pena", "Rey"];
+    await sembrar("config/estado", { registroAbierto: false });
+    for (let i = 0; i < 100; i++) {
+      const nombre = `${N[i % 10]} ${A[Math.floor(i / 10) % 10]} ${B[(i * 7 + Math.floor(i / 10)) % 10]}`, k = claveDeNombre(nombre), c = `p${i}@alumnos.udg.mx`;
+      await sembrar(`lista/${k}`, { nombre }); await sembrar(`participantes/${k}`, { nombre, clave: k, correo: c, origen: "registro", creadoEn: new Date() }); await sembrar(`correos/${c}`, { clave: k });
+    }
+    const f = await p.context().newPage(); f.errores = []; f.on("pageerror", (e) => f.errores.push(e.message));
+    await f.goto(`${BASE}/sorteo.html?emulador`); await f.waitForFunction(() => document.querySelector("#contador").textContent === "100");
+    await f.check("#ensayo");
+    await f.evaluate(() => { window.__f = 0; const t = () => { window.__f++; requestAnimationFrame(t); }; requestAnimationFrame(t); });
+    const t0 = Date.now(); await f.click("#sortear");
+    await f.waitForSelector("#resultado:not([hidden])", { timeout: 20000 });
+    const dur = (Date.now() - t0) / 1000, fps = (await f.evaluate(() => window.__f)) / dur;
+    console.log(`   [info] 100 participantes: revelación a los ${dur.toFixed(1)} s, ${fps.toFixed(0)} fps medios`);
+    assert.ok(dur >= 8 && dur <= 12.5, `duración ${dur}`); assert.ok(fps >= 30, `fps ${fps}`);
+    assert.deepEqual(f.errores, []); await f.close();
+  });
   await prueba("salir: vuelve a login y las páginas de admin redirigen", async () => {
     await p.click("#salir"); await p.waitForURL(/login\.html/);
     const r = await p.context().newPage(); await r.goto(`${BASE}/panel.html?emulador`); await r.waitForURL(/login\.html/);

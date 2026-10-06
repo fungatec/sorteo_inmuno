@@ -9,10 +9,10 @@ const casos = [];
 const caso = (nombre, fn) => casos.push([nombre, fn]);
 
 caso("ejemplo del enunciado", () => {
-  assert.equal(claveDeNombre("Jonathan Gómez Peregrina"), "gomez-jonathan-peregrina");
+  assert.equal(claveDeNombre("Julián Ramírez Soto"), "julian-ramirez-soto");
 });
 caso("distinto orden y mayúsculas dan la misma clave", () => {
-  assert.equal(claveDeNombre("gomez peregrina JONATHAN"), claveDeNombre("Jonathan Gómez Peregrina"));
+  assert.equal(claveDeNombre("ramirez soto JULIAN"), claveDeNombre("Julián Ramírez Soto"));
 });
 caso("acentos y diéresis", () => {
   assert.equal(claveDeNombre("Ángel Müller Ávila"), "angel-avila-muller");
@@ -74,9 +74,9 @@ caso("validarNombre: longitud", () => {
   assert.notEqual(validarNombre("12345 678"), "");
 });
 caso("correo válido y normalización", () => {
-  assert.equal(normalizarCorreo("  Jonathan.Gomez4016@Alumnos.UDG.mx "), "jonathan.gomez4016@alumnos.udg.mx");
-  assert.ok(esCorreoValido("jonathan.gomez4016@alumnos.udg.mx"));
-  assert.ok(esCorreoValido(" JONATHAN.GOMEZ4016@ALUMNOS.UDG.MX "));
+  assert.equal(normalizarCorreo("  Julian.Ramirez0000@Alumnos.UDG.mx "), "julian.ramirez0000@alumnos.udg.mx");
+  assert.ok(esCorreoValido("julian.ramirez0000@alumnos.udg.mx"));
+  assert.ok(esCorreoValido(" JULIAN.RAMIREZ0000@ALUMNOS.UDG.MX "));
 });
 caso("correos inválidos", () => {
   for (const c of ["a@gmail.com", "a@alumnos.udg.mx.evil.com", "a@udg.mx", "@alumnos.udg.mx",
@@ -86,18 +86,18 @@ caso("correos inválidos", () => {
 });
 
 caso("compararConOficial", () => {
-  const k = "gomez-jonathan-peregrina";
-  assert.equal(compararConOficial("Jonathan Gómez Peregrina", "Jonathan Gómez Peregrina", k), "ok");
-  assert.equal(compararConOficial("jonathan  gómez peregrina", "Jonathan Gómez Peregrina", k), "ok");
-  assert.equal(compararConOficial("Gomez Peregrina Jonathan", "Jonathan Gómez Peregrina", k), "difiere");
-  assert.equal(compararConOficial("Pedro Troll", "Jonathan Gómez Peregrina", k), "no-corresponde");
-  assert.equal(compararConOficial("Jonathan Gómez Peregrina", undefined, k), "sin-oficial");
+  const k = "julian-ramirez-soto";
+  assert.equal(compararConOficial("Julián Ramírez Soto", "Julián Ramírez Soto", k), "ok");
+  assert.equal(compararConOficial("julián  ramírez soto", "Julián Ramírez Soto", k), "ok");
+  assert.equal(compararConOficial("Ramirez Soto Julian", "Julián Ramírez Soto", k), "difiere");
+  assert.equal(compararConOficial("Pedro Troll", "Julián Ramírez Soto", k), "no-corresponde");
+  assert.equal(compararConOficial("Julián Ramírez Soto", undefined, k), "sin-oficial");
 });
 caso("analizarLista: válidos, rechazados, repetidos y colisiones", () => {
-  const txt = ["\uFEFFAna López", '"Gómez Peregrina, Jonathan"', "ana lópez", "Ana", "",
+  const txt = ["\uFEFFAna López", '"Ramírez Soto, Julián"', "ana lópez", "Ana", "",
     "María de los Ángeles", "Ángeles María", "Pérez-Gil Luis", "Luis Pérez Gil"].join("\r\n");
   const r = analizarLista(txt);
-  assert.deepEqual(r.validos.map((v) => v.clave).sort(), ["ana-lopez", "gomez-jonathan-peregrina"]);
+  assert.deepEqual(r.validos.map((v) => v.clave).sort(), ["ana-lopez", "julian-ramirez-soto"]);
   assert.equal(r.repetidos, 1); // "ana lópez" repite a "Ana López"
   assert.equal(r.rechazados.length, 1); // "Ana" (3 caracteres)
   assert.deepEqual(r.colisiones.map((c) => c.clave).sort(), ["angeles-maria", "gil-luis-perez"]);
@@ -111,7 +111,7 @@ caso("mensajes de validación en vivo", () => {
   assert.equal(mensajeErrorCorreo("jon@gmail.com"), "El correo debe ser @alumnos.udg.mx");
   assert.equal(mensajeErrorCorreo("jon@alumnos.udg.mx.com"), "El correo debe ser @alumnos.udg.mx");
   assert.match(mensajeErrorCorreo("@alumnos.udg.mx"), /^Revisa el correo/);
-  assert.equal(mensajeErrorCorreo(" Jon.Gomez4016@Alumnos.UDG.mx "), "");
+  assert.equal(mensajeErrorCorreo(" Jul.Ramirez0000@Alumnos.UDG.mx "), "");
 });
 
 let fallos = 0;

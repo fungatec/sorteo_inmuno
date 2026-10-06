@@ -92,8 +92,11 @@
 
     <section class="tarjeta zona-peligro" aria-labelledby="t-peligro">
       <h2 id="t-peligro">Al terminar el evento</h2>
-      <p class="suave">Borra todos los datos personales: lista, participantes, correos y sorteos. No se puede deshacer.</p>
-      <button type="button" class="peligro" id="abrir-vaciar">Vaciar datos al terminar el evento</button>
+      <p class="suave">Primero descarga la constancia del sorteo (fecha, ronda, total y ganador de cada ronda). Después, vaciar borra todos los datos personales: lista, participantes, correos y sorteos. No se puede deshacer.</p>
+      <div class="fila-botones">
+        <button type="button" class="secundario" id="descargar-registro">Descargar registro del sorteo</button>
+        <button type="button" class="peligro" id="abrir-vaciar">Vaciar datos al terminar el evento</button>
+      </div>
     </section>
   </main>
 
@@ -101,7 +104,8 @@
     <form id="form-vaciar" novalidate>
       <h2 id="dlg-titulo">¿Vaciar todos los datos?</h2>
       <p id="dlg-detalle"></p>
-      <p><b>Esta acción es permanente.</b> Incluye el registro de ganadores: anota antes quién ganó.</p>
+      <p><b>Esta acción es permanente.</b> Incluye el registro de ganadores: descarga antes la constancia.</p>
+      <button type="button" class="secundario" id="descargar-registro-dlg">Descargar registro del sorteo</button>
       <label for="confirmar-texto">Para confirmar, escribe BORRAR</label>
       <input id="confirmar-texto" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false">
       <div class="fila-botones">

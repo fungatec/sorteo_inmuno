@@ -28,11 +28,13 @@ js/normalizar.js                                     clave de nombre + validacio
 js/firebase.js  js/firebase-config.js                inicialización de Firebase
 js/registro.js  login.js  panel.js  sorteo.js        lógica por página
 js/auth.js  js/datos.js  js/ui.js  js/azar.js        sesión de admin · acceso a Firestore · DOM seguro · aleatoriedad
+js/escena.js  js/sorteo-util.js                      animación en Canvas · máscara del ganador y registro descargable (módulos independientes)
 firestore.rules                                      reglas de seguridad (fuente de verdad)
-tests/normalizar.test.mjs  tests/azar.test.mjs       node tests/<archivo> (sin dependencias)
+tests/normalizar.test.mjs  tests/azar.test.mjs  tests/sorteo-util.test.mjs   node tests/<archivo> (sin dependencias)
 tests/reglas.emulador.mjs                            pruebas de reglas con emulador (ver README)
 tests/e2e/                                           pruebas de extremo a extremo con navegador + emuladores
 docs/CASOS_PRUEBA_REGLAS.md                          casos para el Rules Playground
+docs/CHECKLIST_PUBLICACION.md                        publicación, prueba en celular y día del evento
 ```
 
 ## Modelo de datos (Firestore)
@@ -44,7 +46,7 @@ docs/CASOS_PRUEBA_REGLAS.md                          casos para el Rules Playgro
 | `correos/{correo}` | `clave` | Índice anti-duplicado de correo. Se escribe **en el mismo `writeBatch`** que el participante. |
 | `admins/{uid}` | — | Admin ⇔ su UID existe aquí. Se gestiona solo desde la consola. UID admin: `i0y2lNrbtRed5L7dTIUFTLSKeQr1`. |
 | `config/estado` | `registroAbierto` (bool) | Debe existir; si no, el registro queda cerrado (falla segura). |
-| `sorteos/{id}` | `fecha` (= serverTimestamp), `totalParticipantes`, `ganadorClave`, `ronda` | No se editan. Solo el admin puede borrarlos, y únicamente lo hace «Vaciar datos». |
+| `sorteos/{id}` | `fecha` (= serverTimestamp), `totalParticipantes`, `ganadorClave`, `ronda`, `adminUid` (= UID de la sesión; las reglas lo verifican) | No se editan. Solo el admin puede borrarlos, y únicamente lo hace «Vaciar datos». |
 
 Al **borrar** un participante hay que borrar también su `correos/{correo}` (mismo batch); las reglas no lo fuerzan.
 
@@ -54,7 +56,7 @@ Al **borrar** un participante hay que borrar también su `correos/{correo}` (mis
 
 | Entrada | Clave |
 |---|---|
-| `Jonathan Gómez Peregrina` / `gomez peregrina JONATHAN` | `gomez-jonathan-peregrina` |
+| `Julián Ramírez Soto` / `ramirez soto JULIAN` | `julian-ramirez-soto` |
 | `Pérez-Gil` / `Pérez Gil` | `gil-perez` |
 | `María de los Ángeles` / `Ángeles María` | `angeles-maria` |
 | `De la Cruz` | `cruz` |
@@ -73,7 +75,7 @@ Correo: minúsculas y sin espacios, debe terminar en `@alumnos.udg.mx` (`normali
 Resumen (el detalle comentado está en `firestore.rules`):
 
 - **Público (sin sesión):** solo **crear** `participantes` + `correos` en un batch, y solo si `registroAbierto == true`, la clave existe en `lista`, ID == campo `clave`, el doc no existe, campos exactamente `nombre, clave, correo, origen, creadoEn`, correo válido, `origen == "registro"`, `creadoEn == request.time`, y ambos docs se crean juntos apuntando a la misma clave (`existsAfter`/`getAfter`). Solo puede **leer** `config/estado`.
-- **Admin:** lee todo; CRUD en `lista`; crea (origen `"admin"`, mismas validaciones de formato, sin exigir registro abierto ni lista) y borra en `participantes`/`correos`; escribe `config/estado`; crea `sorteos` y puede borrarlos (solo para el vaciado final). No hay `update` de participantes ni de sorteos.
+- **Admin:** lee todo; CRUD en `lista`; crea (origen `"admin"`, mismas validaciones de formato, sin exigir registro abierto ni lista) y borra en `participantes`/`correos`; escribe `config/estado`; crea `sorteos` (con `adminUid` igual a su UID) y puede borrarlos (solo para el vaciado final). No hay `update` de participantes ni de sorteos.
 - Todo lo demás: denegado.
 
 ### Errores en el registro (decisión de privacidad)
@@ -94,19 +96,21 @@ Firestore devuelve **siempre** `permission-denied`, sin distinguir causa. Por ta
 
 El login muestra «Usuario» y «Contraseña». El usuario válido es **`admin123`** (`ADMIN_USUARIO`, sin distinguir mayúsculas, recortado); solo entonces se llama a `signInWithEmailAndPassword(auth, ADMIN_CORREO, contraseña)` con `ADMIN_CORREO = admin@admin.admin`. **Cualquier otro usuario (incluido el correo directo) se rechaza antes de llamar a Firebase.** Usuario o contraseña incorrectos dan el mismo mensaje. **La contraseña no existe en el código**: solo se teclea. Tras autenticar, `getDoc(admins/{uid})`; inexistente o `permission-denied` ⇒ cerrar sesión. `panel.html` y `sorteo.html` redirigen a `login.html` sin sesión de admin (`requerirAdmin`).
 
-## Sorteo (implementado en `js/sorteo.js`)
+## Sorteo y proyección (Paso 3: `js/sorteo.js`, `js/escena.js`, `js/sorteo-util.js`)
 
-- Aleatoriedad con `crypto.getRandomValues` y **muestreo por rechazo** (`js/azar.js`, sin sesgo de módulo); nunca `Math.random` (tampoco en la animación).
-- El ganador se elige **y se guarda antes** de la animación; si el guardado falla no se revela a nadie y se puede reintentar. `sorteos` guarda `totalParticipantes` (= tamaño del grupo elegible en esa ronda, tras excluir ganadores previos), `ganadorClave`, `ronda` y `fecha` = `serverTimestamp()`.
-- Rondas: se excluyen automáticamente los ganadores de rondas guardadas. **Casilla «Ensayo»:** sortea y anima sin guardar ni excluir, con etiqueta visible «ENSAYO · no se guarda». Los sorteos guardados no se pueden editar y solo se borran con «Vaciar datos», así que **ensaya siempre con la casilla marcada**.
-- Se muestra solo el **nombre oficial** del ganador (`lista/{clave}`; si la clave no está en la lista, el tecleado). Nunca correos ni la tabla completa.
-- Animación: acercamiento del antígeno → reconocimiento (parpadeo que se frena sobre un clon) → proliferación clonal (14 células) → nombre en verde. Respeta `prefers-reduced-motion` (revela directo).
+- **Elección:** `crypto.getRandomValues` con **muestreo por rechazo** (`js/azar.js`, sin sesgo de módulo). **Nunca `Math.random`** (ni en la animación: el azar visual usa un PRNG sembrado con `crypto`). `grep Math.random js/` solo debe encontrar comentarios.
+- **Orden:** se elige y se **guarda antes** de animar; si el guardado falla no se revela a nadie y se reintenta. `sorteos` guarda `fecha` (= `serverTimestamp()`), `totalParticipantes` (= tamaño del grupo elegible en esa ronda, tras excluir ganadores previos), `ganadorClave`, `ronda` y `adminUid`.
+- **«Volver a sortear»** (botón o Espacio): vuelve a sortear **al instante** excluyendo a los ganadores previos guardados y suma una ronda. **Casilla «Ensayo»:** anima sin guardar, con etiqueta «ENSAYO · no se guarda»; los ganadores de ensayo solo se excluyen entre sí durante esa sesión de pantalla. Los sorteos guardados no se editan y solo se borran con «Vaciar datos»: **ensaya siempre con la casilla marcada**.
+- **Nombre en pantalla:** siempre el **oficial** (`lista/{clave}.nombre`; si la clave no está en la lista —alta manual—, el capturado, con aviso al admin), nunca el tecleado en el registro. Se muestra una **máscara** `Nombre I. I.` (`enmascararNombre`: primera palabra + iniciales de las demás, sin partículas). **No lleva dígitos de código: no existe código de estudiante.** Asume que la lista oficial se escribe «Nombre Apellidos»; si no, el botón/tecla «Mostrar nombre completo» (N) revela el oficial.
+- **Modo proyección:** `sorteo.html` en pantalla completa (botón o **F**); los mandos se ocultan a los 3 s sin actividad y reaparecen al mover el ratón/tocar. Espacio/Enter = sortear. En pantallas < 640 px los mandos van bajo la escena. iOS no permite pantalla completa de un elemento: usar laptop.
+- **Guion de la animación (≈ 11,4 s; Canvas 2D sin librerías, ~60 fps con 100 participantes):** E1 repertorio 0–2,2 s (un linfocito B por participante, sin nombres) · E2 el antígeno (libro) explora 2,2–6,0 s · E3 reconocimiento 6,0–8,2 s (se une a UN clon; los demás se desvanecen) · E4 expansión clonal 8,2–11,4 s (1→2→4→8→16 en verde, anillo, nombre al ~45 %). `prefers-reduced-motion`: sin movimiento ni libro, fundido a la escena final (~1 s). Tope visual de 300 células (el sorteo usa a todos). Vocabulario y límites biológicos: ver «Metáfora visual».
+- **Constancia:** el panel descarga `registro-sorteo-AAAA-MM-DD.txt` (fecha, ronda, total, ganador oficial, UID del admin; `textoRegistroSorteo`). Debe descargarse **antes** de «Vaciar datos».
 
 ## Interfaz (Paso 2)
 
 - **Registro:** solo nombre completo y correo (no hay código de estudiante: ni el modelo ni las reglas lo admiten). Validación **en vivo** bajo cada campo (`validarEnVivo` + `mensajeErrorNombre`/`mensajeErrorCorreo`; p. ej. «El correo debe ser @alumnos.udg.mx»). Si `registroAbierto` es false, la tarjeta «El registro está cerrado» **reemplaza** al formulario. Una línea de privacidad: «Tus datos se usan solo para este sorteo y se eliminarán al terminar el evento» (solo es verdad si la admin usa «Vaciar datos»). Éxito: animación de un linfocito B (verde) incorporándose al repertorio.
 - **Panel:** interruptor accesible (`role="switch"`) de registro; tabla de participantes (nombre oficial, correo, origen, fecha) con búsqueda sin acentos y contador; pestañas operables con ← → Inicio Fin; alta manual con las mismas validaciones; eliminar con confirmación.
-- **Vaciar datos:** diálogo modal que exige escribir `BORRAR` (botón deshabilitado hasta entonces, y se re-verifica al enviar). Cierra el registro primero y borra `participantes`, `correos`, `sorteos` y `lista` (no toca `admins` ni `config`). Irreversible: incluye el registro de ganadores.
+- **Vaciar datos:** (antes, «Descargar registro del sorteo») diálogo modal que exige escribir `BORRAR` (botón deshabilitado hasta entonces, y se re-verifica al enviar). Cierra el registro primero y borra `participantes`, `correos`, `sorteos` y `lista` (no toca `admins` ni `config`). Irreversible: incluye el registro de ganadores.
 - Accesibilidad: auditada con axe-core (WCAG 2.0/2.1 A y AA) a 360 px en las cuatro pantallas, sin violaciones. Responsivo desde 360 px (la tabla se apila en tarjetas bajo 640 px). Cualquier cambio de interfaz debe mantener esa auditoría en cero.
 
 ## Identidad visual
@@ -140,6 +144,7 @@ Guía de textos y animación:
 ```bash
 node tests/normalizar.test.mjs                      # normalización (sin dependencias)
 node tests/azar.test.mjs                            # aleatoriedad (sin dependencias)
+node tests/sorteo-util.test.mjs                     # máscara y registro descargable (sin dependencias)
 # Pruebas de reglas (requiere Java; ver README):
 npm i --no-save firebase-tools @firebase/rules-unit-testing firebase
 npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/reglas.emulador.mjs"

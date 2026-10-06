@@ -6,7 +6,7 @@ export const NOMBRE_MIN = 5;
 export const NOMBRE_MAX = 100;
 
 // Partículas que se ignoran al construir la clave ("María de los Ángeles" ≡ "María Ángeles").
-const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y"]);
+export const PARTICULAS = new Set(["de", "del", "la", "las", "los", "y"]);
 
 /**
  * Clave normalizada de un nombre (ID de lista/{clave} y participantes/{clave}).

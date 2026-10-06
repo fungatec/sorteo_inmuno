@@ -163,8 +163,9 @@ service cloud.firestore {
     match /sorteos/{id} {
       allow read, delete: if esAdmin();
       allow create: if esAdmin()
-        && request.resource.data.keys().hasOnly(['fecha', 'totalParticipantes', 'ganadorClave', 'ronda'])
-        && request.resource.data.keys().hasAll(['fecha', 'totalParticipantes', 'ganadorClave', 'ronda'])
+        && request.resource.data.keys().hasOnly(['fecha', 'totalParticipantes', 'ganadorClave', 'ronda', 'adminUid'])
+        && request.resource.data.keys().hasAll(['fecha', 'totalParticipantes', 'ganadorClave', 'ronda', 'adminUid'])
+        && request.resource.data.adminUid == request.auth.uid      // quién registró la ronda
         && request.resource.data.fecha == request.time
         && request.resource.data.totalParticipantes is int
         && request.resource.data.totalParticipantes >= 1
