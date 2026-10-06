@@ -35,6 +35,7 @@ async function sembrar(ruta, datos) {
     body: JSON.stringify({ fields: Object.fromEntries(Object.entries(datos).map(([k, v]) => [k, val(v)])) }) });
   assert.ok(r.ok, `sembrar ${ruta}: ${await r.text()}`);
 }
+async function borrar(ruta) { await fetch(`${FS}/${ruta}`, { method: "DELETE", headers: OWNER }); }
 async function leer(ruta) { const r = await fetch(`${FS}/${ruta}`, { headers: OWNER }); return r.ok ? r.json() : null; }
 async function listar(col) { const r = await fetch(`${FS}/${col}`, { headers: OWNER }); return (await r.json()).documents ?? []; }
 await fetch("http://127.0.0.1:8080/emulator/v1/projects/sorteoinmuno/databases/(default)/documents", { method: "DELETE" });
@@ -72,6 +73,21 @@ const DENEGADO = /avisa a la maestra/;
   await prueba("registro: muestra 'Registro abierto'", async () => { await p.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto"); });
   await prueba("registro: aviso de privacidad de una línea", async () => {
     assert.match(await p.textContent(".privacidad"), /solo para este sorteo y se eliminarán al terminar el evento/);
+  });
+  await prueba("seguridad: registrar un nombre con <img src=x onerror=alert(1)> no ejecuta nada, se rechaza y no crea datos", async () => {
+    const dialogos = []; p.on("dialog", (d) => { dialogos.push(d.message()); d.dismiss(); });
+    const PAYLOAD = "<img src=x onerror=alert(1)>";
+    const antes = (await listar("participantes")).length;
+    await p.fill("#nombre", PAYLOAD); await p.fill("#correo", "xss@alumnos.udg.mx"); await p.click("#enviar");
+    await p.waitForFunction(() => /no puede contener/.test(document.querySelector("#nombre-error").textContent));
+    await p.waitForTimeout(400);
+    assert.deepEqual(dialogos, [], "no debe ejecutarse alert()");
+    assert.equal(await p.locator("main img").count(), 0, "no debe existir ningún <img> inyectado");
+    assert.equal(await p.getAttribute("#nombre", "aria-invalid"), "true");
+    assert.equal(await p.inputValue("#nombre"), PAYLOAD, "el campo conserva el texto literal");
+    assert.equal((await listar("participantes")).length, antes, "no se creó ningún participante");
+    // Aunque el cliente lo permitiera, las reglas lo rechazan (prueba directa a Firestore con el mismo payload).
+    p.removeAllListeners("dialog");
   });
   await prueba("registro: validación en vivo (correo @gmail) y se corrige sola", async () => {
     await p.fill("#nombre", "Julián Ramírez Soto");
@@ -134,17 +150,54 @@ const DENEGADO = /avisa a la maestra/;
 // ------------------------------------------------------------------ LOGIN
 {
   const p = await nuevaPagina(); await p.goto(`${BASE}/login.html?emulador`);
+  await prueba("login: campos sin autocapitalizar ni autocorregir; usuario con autocomplete=username", async () => {
+    for (const id of ["#usuario", "#contrasena"]) {
+      assert.equal(await p.getAttribute(id, "autocapitalize"), "none", id);
+      assert.equal(await p.getAttribute(id, "autocorrect"), "off", id);
+      assert.equal(await p.getAttribute(id, "spellcheck"), "false", id);
+    }
+    assert.equal(await p.getAttribute("#usuario", "autocomplete"), "username");
+  });
+  await prueba("login: usuario con espacios y mayúsculas ('  ADMIN123\t') se normaliza; contraseña mala → mensaje de credenciales y código en consola", async () => {
+    const errores = []; const oyente = (m) => { if (m.type() === "error") errores.push(m.text()); }; p.on("console", oyente);
+    await p.fill("#usuario", "  ADMIN123\t"); await p.fill("#contrasena", "mala"); await p.click("#entrar");
+    await p.waitForFunction(() => /incorrectos/.test(document.querySelector("#aviso").textContent) && !document.querySelector("#entrar").disabled);
+    p.off("console", oyente);
+    assert.ok(errores.some((t) => /auth\/(invalid-credential|wrong-password)/.test(t)), "console.error con el código: " + errores.join(" | "));
+    assert.ok(!errores.some((t) => t.includes("mala")), "nunca la contraseña en consola");
+  });
+  for (const [nombre, cuerpo, esperado] of [
+    ["sin conexión (petición abortada)", null, /No pudimos conectar con el servicio de acceso/],
+    ["método de acceso desactivado", { error: { code: 400, message: "OPERATION_NOT_ALLOWED" } }, /desactivado en Firebase Authentication/],
+    ["dominio no autorizado", { error: { code: 400, message: "UNAUTHORIZED_DOMAIN : localhost" } }, /no está autorizado en Firebase Authentication/],
+    ["clave de API inválida o bloqueada", { error: { code: 400, message: "API key not valid. Please pass a valid API key.", status: "INVALID_ARGUMENT", errors: [{ reason: "badRequest" }] } }, /clave de API/],
+  ]) await prueba(`login: ${nombre} → mensaje propio, claro y que no revela usuario/contraseña, con el código en consola`, async () => {
+    const q = await nuevaPagina(); await q.goto(`${BASE}/login.html?emulador`);
+    const consola = []; q.on("console", (m) => { if (m.type() === "error") consola.push(m.text()); });
+    await q.route(/accounts:signInWithPassword/, (r) => cuerpo ? r.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify(cuerpo) }) : r.abort());
+    await q.fill("#usuario", "admin123"); await q.fill("#contrasena", "lo-que-sea"); await q.click("#entrar");
+    await q.waitForFunction(() => document.querySelector("#aviso").textContent.length > 0 && !document.querySelector("#entrar").disabled);
+    const t = await q.textContent("#aviso");
+    assert.match(t, esperado, t);
+    assert.ok(!/incorrectos/.test(t), "no debe parecer un fallo de credenciales: " + t);
+    assert.ok(consola.some((c) => /\[login\] error de Firebase: auth\//.test(c)), "console.error con el código: " + consola.join(" | "));
+    console.log(`   [info] ${nombre}: «${t.slice(0, 70)}…» · consola: ${consola.find((c) => c.includes("[login]"))?.replace("[login] error de Firebase: ", "")}`);
+    await q.close();
+  });
   await prueba("login: usuario 'admin' (no admin123) se rechaza SIN llamar a Firebase", async () => {
+    p.authCalls = 0;
     await p.fill("#usuario", "admin"); await p.fill("#contrasena", PASS); await p.click("#entrar");
     await p.waitForFunction(() => /incorrectos/.test(document.querySelector("#aviso").textContent));
     assert.equal(p.authCalls, 0);
   });
   await prueba("login: correo directo 'admin@admin.admin' tampoco se acepta", async () => {
+    p.authCalls = 0;
     await p.fill("#usuario", "admin@admin.admin"); await p.fill("#contrasena", PASS); await p.click("#entrar");
     await p.waitForFunction(() => /incorrectos/.test(document.querySelector("#aviso").textContent));
     assert.equal(p.authCalls, 0);
   });
   await prueba("login: contraseña incorrecta → mismo mensaje (llama a Firebase)", async () => {
+    p.authCalls = 0;
     await p.fill("#usuario", "admin123"); await p.fill("#contrasena", "mala"); await p.click("#entrar");
     await p.waitForFunction(() => /incorrectos/.test(document.querySelector("#aviso").textContent) && !document.querySelector("#entrar").disabled);
     assert.equal(p.authCalls, 1);
@@ -203,13 +256,33 @@ const DENEGADO = /avisa a la maestra/;
     await p.fill("#texto-lista", ["Luis Pérez-Gil", "Pérez Gil Luis", "Rosa de las Nieves", "Rosa Nieves", "Ana", "Carlos Ruiz", "carlos ruiz"].join("\n"));
     await p.click("#analizar");
     const t = await p.textContent("#vista-previa");
-    assert.match(t, /1 nombres listos/); assert.match(t, /2 colisión/); assert.match(t, /Rosa de las Nieves {1,3}↔ {1,3}Rosa Nieves/); assert.match(t, /Ana/); assert.match(t, /1 línea\(s\) repetida/);
+    assert.match(t, /Se leyeron 7 nombres/); assert.match(t, /1 listos para guardar/);
+    assert.equal(await p.locator("#muestra-lista li").count(), 1);
+    assert.match(await p.textContent("#muestra-lista"), /Carlos R\..*se guardará como «Carlos Ruiz»/); assert.match(t, /2 colisión/); assert.match(t, /Rosa de las Nieves {1,3}↔ {1,3}Rosa Nieves/); assert.match(t, /Ana/); assert.match(t, /1 línea\(s\) repetida/);
     // Luis Pérez-Gil y Pérez Gil Luis son el MISMO nombre escrito distinto → colisión (nombres distintos, misma clave)
     await p.click("#guardar-lista"); await p.waitForSelector("#vista-previa", { state: "hidden" });
   });
   await prueba("panel: lista guardada en Firestore y reflejada", async () => {
     assert.ok(await leer("lista/carlos-ruiz")); assert.equal(await leer("lista/gil-luis-perez"), null);
     await p.waitForFunction(() => /Carlos Ruiz/.test(document.querySelector("#lista-actual").textContent));
+  });
+  await prueba("panel: lista pegada con viñetas, asteriscos, numeración y puntos finales se guarda LIMPIA; vista previa con máscara de los 3 primeros", async () => {
+    await p.click("#tab-b-lista");
+    await p.fill("#texto-lista", ["• SARA NIETO LUNA.", "* LEO RIOS PAZ,", "3. MARTA ELENA RIOS Y VEGA SOTO.", "- ROSA DEL PILAR MORA DIAZ", "<b>MALO NOMBRE</b>"].join("\n"));
+    await p.click("#analizar");
+    const t = await p.textContent("#vista-previa");
+    assert.match(t, /Se leyeron 5 nombres/); assert.match(t, /4 listos para guardar/); assert.match(t, /no puede contener/);
+    assert.equal(await p.locator("#muestra-lista li").count(), 3, "solo los 3 primeros");
+    const muestra = await p.textContent("#muestra-lista");
+    for (const f of ["Sara N. L.", "Leo R. P.", "Marta E. R. V. S.", "«SARA NIETO LUNA»", "«LEO RIOS PAZ»"]) assert.ok(muestra.includes(f), f + " ⊄ " + muestra);
+    assert.ok(!muestra.includes("Rosa"), "la 4.ª no aparece en la muestra");
+    await p.click("#guardar-lista"); await p.waitForSelector("#vista-previa", { state: "hidden" });
+    assert.equal((await leer("lista/luna-nieto-sara")).fields.nombre.stringValue, "SARA NIETO LUNA");
+    assert.equal((await leer("lista/leo-paz-rios")).fields.nombre.stringValue, "LEO RIOS PAZ");
+    assert.equal((await leer("lista/diaz-mora-pilar-rosa")).fields.nombre.stringValue, "ROSA DEL PILAR MORA DIAZ");
+    assert.equal((await leer("lista/elena-marta-rios-soto-vega")).fields.nombre.stringValue, "MARTA ELENA RIOS Y VEGA SOTO");
+    await borrar("lista/luna-nieto-sara"); await borrar("lista/leo-paz-rios"); await borrar("lista/diaz-mora-pilar-rosa"); await borrar("lista/elena-marta-rios-soto-vega");
+    await p.click("#tab-b-participantes");
   });
   await prueba("panel: alta manual (origen admin) y duplicado rechazado", async () => {
     await p.click("#tab-b-alta");
@@ -376,6 +449,36 @@ const DENEGADO = /avisa a la maestra/;
     await w.close();
   });
   // cerrar sesión
+  await prueba("seguridad: datos YA guardados con <img src=x onerror=alert(1)> (nombre, nombre oficial, correo) se muestran como texto en panel y sorteo", async () => {
+    const PAYLOAD = "<img src=x onerror=alert(1)>", TECLEADO = PAYLOAD + " de", OFICIAL = "<IMG src=x onerror=alert(1)>", CORREO = "<img src=x onerror=alert(1)>@alumnos.udg.mx";
+    const { claveDeNombre } = await import(`${REPO}/js/normalizar.js`);
+    const k = claveDeNombre(PAYLOAD);
+    assert.equal(k, claveDeNombre(OFICIAL));
+    // Escritos con el token "owner" (se saltan las reglas), como datos antiguos o escritos desde la consola.
+    await sembrar(`lista/${k}`, { nombre: OFICIAL });
+    await sembrar(`participantes/${k}`, { nombre: TECLEADO, clave: k, correo: CORREO, origen: "registro", creadoEn: new Date() });
+    await sembrar(`correos/${encodeURIComponent(CORREO)}`, { clave: k });
+    const x = await p.context().newPage(); const dialogos = [];
+    x.on("dialog", (d) => { dialogos.push(d.message()); d.dismiss(); }); x.errores = []; x.on("pageerror", (e) => x.errores.push(e.message));
+    await x.goto(`${BASE}/panel.html?emulador`); await x.waitForFunction(() => document.querySelector("#n-registrados").textContent === "1");
+    await x.click("#tab-b-lista");
+    for (const [zona, esperado] of [["#participantes", OFICIAL], ["#participantes", CORREO], ["#participantes", `Tecleó: «${TECLEADO}»`], ["#lista-actual", OFICIAL]])
+      assert.ok((await x.textContent(zona)).includes(esperado), `${zona} debe mostrar como TEXTO: ${esperado}`);
+    assert.equal(await x.locator("#participantes img, #lista-actual img, main img").count(), 0, "ningún <img> en el panel");
+    assert.equal(await x.getAttribute("#participantes button", "aria-label"), `Eliminar a ${OFICIAL}`);
+    // Sorteo: pool de 1 → gana el único; la máscara y el nombre completo (tecla N) se muestran como texto.
+    await x.goto(`${BASE}/sorteo.html?emulador`); await x.waitForFunction(() => document.querySelector("#contador").textContent === "1");
+    await x.emulateMedia({ reducedMotion: "reduce" }); await x.reload(); await x.waitForFunction(() => document.querySelector("#contador").textContent === "1");
+    await x.check("#ensayo"); await x.click("#sortear"); await x.waitForSelector("#resultado:not([hidden])");
+    assert.match(await x.textContent("#ganador"), /^<img /, "la máscara se muestra literal");
+    await x.keyboard.press("n");
+    assert.ok((await x.textContent("#ganador")).includes("<img "), "el nombre completo se muestra literal");
+    assert.equal(await x.locator("#proyeccion img, main img").count(), 0, "ningún <img> en el sorteo");
+    await x.waitForTimeout(500);
+    assert.deepEqual(dialogos, [], "no debe ejecutarse alert()"); assert.deepEqual(x.errores, []);
+    await x.close();
+    await borrar(`lista/${k}`); await borrar(`participantes/${k}`); await borrar(`correos/${encodeURIComponent(CORREO)}`);
+  });
   await prueba("rendimiento: 100 participantes → animación fluida (≥ 30 fps) y revelación entre 8 y 12 s", async () => {
     const { claveDeNombre } = await import(`${REPO}/js/normalizar.js`);
     const N = ["Ana", "Luis", "Marta", "Pedro", "Sofia", "Diego", "Elena", "Raul", "Irene", "Hugo"];

@@ -8,7 +8,7 @@ import { requerirAdmin, cerrarSesion } from "./auth.js";
 import { leerColeccion, guardarSorteo } from "./datos.js";
 import { enteroAleatorio } from "./azar.js";
 import { crearEscena, FRASES } from "./escena.js";
-import { enmascararNombre } from "./sorteo-util.js";
+import { enmascararNombre, formatoTitulo } from "./sorteo-util.js";
 import { $, h, aviso, avisoConfigPendiente } from "./ui.js";
 
 const msg = $("#aviso"), proyeccion = $("#proyeccion"), boton = $("#sortear"), btnNombre = $("#nombre-completo");
@@ -27,6 +27,8 @@ escena.alRevelar(() => mostrarResultado());
 
 // ------------------------------------------------------------------ datos
 const nombreOficial = (p) => oficiales.get(p.id) ?? p.nombre;
+/** Nombre oficial para mostrar: la lista viene en MAYÚSCULAS; en pantalla va en formato título. */
+const nombreVisible = (clave) => formatoTitulo(oficiales.get(clave) ?? participantes.find((p) => p.id === clave)?.nombre ?? clave);
 const ganadoresPrevios = () => new Set(sorteos.map((s) => s.ganadorClave));
 function elegibles() {
   const g = ganadoresPrevios();
@@ -62,7 +64,7 @@ function preparar() {
   boton.disabled = pool.length === 0 || ocupado;
   if (!pool.length) aviso(msg, participantes.length
     ? "No quedan clones elegibles: todos los participantes ya fueron ganadores." : "No hay participantes inscritos. Revisa el panel.", "aviso");
-  const previos = sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${oficiales.get(s.ganadorClave) ?? s.ganadorClave}`));
+  const previos = sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${nombreVisible(s.ganadorClave)}`));
   $("#lista-previos").replaceChildren(...previos); $("#previos").hidden = !previos.length;
 }
 
@@ -104,8 +106,8 @@ async function sortear() {
     }
   } else ensayoGanadores.add(p.id);
 
-  const oficial = nombreOficial(p);
-  actual = { p, oficial, mascara: enmascararNombre(oficial), ensayo };
+  const oficial = nombreOficial(p);                        // tal como está en la lista (MAYÚSCULAS)
+  actual = { p, oficial: formatoTitulo(oficial), mascara: enmascararNombre(oficial), ensayo };
   if (!oficiales.has(p.id)) aviso(msg, "El ganador no está en la lista oficial: se usó el nombre capturado en el alta manual.", "aviso");
 
   escena.establecerClones(pool.length);               // un clon por participante elegible de esta ronda
@@ -118,7 +120,7 @@ async function sortear() {
   boton.textContent = "Volver a sortear"; boton.disabled = quedan === 0;
   if (!quedan) aviso(msg, "Ya no quedan clones elegibles para otra ronda.", "aviso");
   mostrarResultado(); $("#fase").textContent = "Clon seleccionado.";
-  if (!ensayo) $("#lista-previos").replaceChildren(...sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${oficiales.get(s.ganadorClave) ?? s.ganadorClave}`)));
+  if (!ensayo) $("#lista-previos").replaceChildren(...sorteos.map((s) => h("li", {}, `Ronda ${s.ronda}: ${nombreVisible(s.ganadorClave)}`)));
   $("#previos").hidden = !sorteos.length;
 }
 boton.addEventListener("click", sortear);

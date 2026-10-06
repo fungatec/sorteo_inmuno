@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   claveDeNombre, limpiarNombre, validarNombre, normalizarCorreo, esCorreoValido,
-  compararConOficial, analizarLista, mensajeErrorNombre, mensajeErrorCorreo,
+  compararConOficial, analizarLista, limpiarLineaLista, mensajeErrorNombre, mensajeErrorCorreo,
 } from "../js/normalizar.js";
 
 const casos = [];
@@ -112,6 +112,33 @@ caso("mensajes de validación en vivo", () => {
   assert.equal(mensajeErrorCorreo("jon@alumnos.udg.mx.com"), "El correo debe ser @alumnos.udg.mx");
   assert.match(mensajeErrorCorreo("@alumnos.udg.mx"), /^Revisa el correo/);
   assert.equal(mensajeErrorCorreo(" Jul.Ramirez0000@Alumnos.UDG.mx "), "");
+});
+
+caso("nombres con < > & o comillas se rechazan (defensa contra inyección de HTML)", () => {
+  for (const malo of ["<img src=x onerror=alert(1)>", "Ana <b>López</b>", "Ana & López", 'Ana "Lola" López',
+    "Ana 'Lola' López", "Ana `López`", "Ana “López” Soto", "Ana ‘López’ Soto", "Ana López >"]) {
+    assert.match(validarNombre(malo), /no puede contener/, malo);
+    assert.match(mensajeErrorNombre(malo), /no puede contener/, malo);
+  }
+  for (const bueno of ["Ana López", "MARIA DE LA LUZ RIOS SOTO", "Íñigo Peña-Gil", "Ana M. López"]) assert.equal(validarNombre(bueno), "", bueno);
+});
+caso("limpiarLineaLista: viñetas, asteriscos, numeración, comillas y puntos finales", () => {
+  const casos = {
+    "• ANA LOPEZ SOTO": "ANA LOPEZ SOTO", "* ANA LOPEZ SOTO": "ANA LOPEZ SOTO", "- ANA LOPEZ SOTO": "ANA LOPEZ SOTO",
+    "– ANA LOPEZ SOTO": "ANA LOPEZ SOTO", "***ANA LOPEZ SOTO": "ANA LOPEZ SOTO", "1. ANA LOPEZ SOTO": "ANA LOPEZ SOTO",
+    "12) ANA LOPEZ SOTO": "ANA LOPEZ SOTO", "ANA LOPEZ SOTO.": "ANA LOPEZ SOTO", "ANA LOPEZ SOTO...": "ANA LOPEZ SOTO",
+    "ANA LOPEZ SOTO,": "ANA LOPEZ SOTO", "ANA LOPEZ SOTO;": "ANA LOPEZ SOTO", '"ANA LOPEZ SOTO"': "ANA LOPEZ SOTO",
+    "  •  ANA   LOPEZ  SOTO .  ": "ANA LOPEZ SOTO", "\tANA LOPEZ SOTO\r": "ANA LOPEZ SOTO",
+    "- 3. ANA LOPEZ SOTO.": "ANA LOPEZ SOTO", "ANA M. LOPEZ SOTO": "ANA M. LOPEZ SOTO",   // los puntos interiores se conservan
+  };
+  for (const [entrada, esperado] of Object.entries(casos)) assert.equal(limpiarLineaLista(entrada), esperado, JSON.stringify(entrada));
+  assert.equal(limpiarLineaLista(null), "");
+});
+caso("analizarLista: total leído, limpieza al guardar y rechazo de marcado", () => {
+  const r = analizarLista(["• ANA LOPEZ SOTO.", "* LUIS PAZ LUNA", "", "<img src=x onerror=alert(1)>", "3. ROSA DEL PILAR MORA DIAZ,"].join("\n"));
+  assert.equal(r.total, 4);                                                   // líneas con contenido
+  assert.deepEqual(r.validos.map((v) => v.nombre), ["ANA LOPEZ SOTO", "LUIS PAZ LUNA", "ROSA DEL PILAR MORA DIAZ"]);
+  assert.equal(r.rechazados.length, 1); assert.match(r.rechazados[0].motivo, /no puede contener/);
 });
 
 let fallos = 0;

@@ -7,7 +7,7 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 ## Cómo se usa
 
 1. La admin entra en `login.html` con **Usuario `admin123`** y la contraseña de la cuenta.
-2. En el panel → *Lista de la clase*: sube o pega un nombre por línea, **revisa** la vista previa (colisiones y líneas rechazadas) y guarda.
+2. En el panel → *Lista de la clase*: sube o pega un nombre por línea (se limpian viñetas, asteriscos, numeración y puntos finales), **revisa** la vista previa (total leído, los 3 primeros con la máscara, colisiones y líneas rechazadas) y guarda. Los nombres no pueden llevar `< > &` ni comillas (ni apóstrofos).
 3. Abre el registro (botón en el panel) y comparte `https://fungatec.github.io/sorteo_inmuno/`.
 4. En el panel, *Participantes* muestra el nombre oficial y avisa si lo tecleado difiere o no corresponde; *Alta manual* cubre a quien no pudo registrarse.
 5. En el evento: cierra el registro, abre *Ir al sorteo*, pulsa **F** (pantalla completa), haz un **ensayo** (casilla marcada) y luego los sorteos reales. *Volver a sortear* excluye a los ganadores previos. En pantalla sale una máscara `Nombre I. I.`; *Mostrar nombre completo* (tecla **N**) revela el nombre oficial.
@@ -18,7 +18,7 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 > Lista completa para publicar, probar en el celular y operar el evento: [`docs/CHECKLIST_PUBLICACION.md`](docs/CHECKLIST_PUBLICACION.md).
 
 1. ~~Pegar la configuración de Firebase en `js/firebase-config.js`~~ — **hecho**.
-2. **Publicar las reglas** (otra vez, si ya las publicaste: el Paso 2 permite al admin borrar `sorteos` y el Paso 3 exige `adminUid` al crearlos): Firebase Console → Firestore Database → **Reglas** → pegar el contenido completo de `firestore.rules` → **Publicar**. Sin esto, el sorteo no se puede guardar y el vaciado falla.
+2. **Publicar las reglas** (otra vez, si ya las publicaste: el Paso 2 permite al admin borrar `sorteos`, el Paso 3 exige `adminUid` al crearlos y el Paso 4 rechaza `< > &` y comillas en los nombres): Firebase Console → Firestore Database → **Reglas** → pegar el contenido completo de `firestore.rules` → **Publicar**. Sin esto, el sorteo no se puede guardar y el vaciado falla.
 3. **Crear `config/estado`** (Firestore → Datos → *Iniciar colección* `config` → ID `estado` → campo `registroAbierto` tipo *boolean* = `false`). Sin este documento el registro queda cerrado (a propósito).
 4. **Autorizar el dominio:** Authentication → Configuración → **Dominios autorizados** → *Agregar dominio* → `fungatec.github.io` (solo el dominio, sin ruta ni `https://`; si el repositorio pasa a otro usuario/organización, usa su `<usuario>.github.io`).
 5. **Activar GitHub Pages:** repositorio → Settings → Pages → *Deploy from a branch* → rama `main`, carpeta `/ (root)`. Con plan gratuito el repositorio debe ser **público**. Enlace a compartir: `https://fungatec.github.io/sorteo_inmuno/`.
@@ -32,7 +32,8 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 ```bash
 node tests/normalizar.test.mjs        # normalización (sin dependencias)
 node tests/azar.test.mjs              # aleatoriedad del sorteo (sin dependencias)
-node tests/sorteo-util.test.mjs       # máscara del ganador y registro descargable (sin dependencias)
+node tests/sorteo-util.test.mjs       # máscara, formato título y registro descargable (sin dependencias)
+node tests/login-errores.test.mjs     # errores del login (sin dependencias)
 ```
 
 Reglas con el emulador de Firestore (batches y `serverTimestamp` reales; requiere Java 11+):
@@ -44,7 +45,7 @@ npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/
 
 (Si `firebase.json` no existe, el emulador usa los puertos por defecto; pasa `--config` o crea uno con `{"firestore":{"rules":"firestore.rules"}}`.)
 
-De extremo a extremo (navegador real + emuladores de Auth y Firestore, 41 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
+De extremo a extremo (navegador real + emuladores de Auth y Firestore, 50 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
 
 ## Desarrollo local
 

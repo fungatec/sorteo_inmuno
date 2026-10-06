@@ -48,13 +48,16 @@ Cuerpo base de un participante (`creadoEn` = `request.time`):
 | 14 | Igual que 13 pero `adminUid` distinto del UID de la sesión, o sin `adminUid` | — | **Denegado** |
 | 15 | **create** `/sorteos/nuevo` — sin autenticar o usuario no-admin | como 13 | **Denegado** |
 
+| 16 | **create** `/participantes/prueba-uno` — nombre con marcado o comillas | `nombre: "<img src=x onerror=alert(1)>"` (o `Ana & López`, `Ana "Lola" López`, `Ana 'Lola' López`, `Ana “López”`) y el resto como el caso 1 | **Denegado** (antes del Paso 4 se aceptaba) |
+| 17 | **create** `/lista/prueba-tres` — admin, `nombre` con `<`, `>`, `&` o comillas | — | **Denegado** |
+
 Casos extra recomendados: campo adicional (`x:1`) → Denegado; `origen:"admin"` sin ser admin → Denegado; `nombre` de 4 caracteres → Denegado; `update` o `delete` de un participante sin ser admin → Denegado.
 
 ## Limpieza
 
 Borra `lista/prueba-*`, `participantes/prueba-*`, `correos/*prueba*`, `correos/fuera.lista@…` y confirma que `config/estado` queda como corresponda.
 
-## Equivalencia con los casos del Paso 1 en la suite del emulador (`tests/reglas.emulador.mjs`, 46 casos)
+## Equivalencia con los casos del Paso 1 en la suite del emulador (`tests/reglas.emulador.mjs`, 57 casos)
 
 | Caso del Paso 1 | Prueba del emulador (resultado esperado) |
 |---|---|

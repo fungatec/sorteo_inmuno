@@ -28,9 +28,9 @@ js/normalizar.js                                     clave de nombre + validacio
 js/firebase.js  js/firebase-config.js                inicialización de Firebase
 js/registro.js  login.js  panel.js  sorteo.js        lógica por página
 js/auth.js  js/datos.js  js/ui.js  js/azar.js        sesión de admin · acceso a Firestore · DOM seguro · aleatoriedad
-js/escena.js  js/sorteo-util.js                      animación en Canvas · máscara del ganador y registro descargable (módulos independientes)
+js/escena.js  js/sorteo-util.js  js/login-errores.js  animación en Canvas · máscara/formato del nombre y registro descargable · mensajes del login (módulos puros)
 firestore.rules                                      reglas de seguridad (fuente de verdad)
-tests/normalizar.test.mjs  tests/azar.test.mjs  tests/sorteo-util.test.mjs   node tests/<archivo> (sin dependencias)
+tests/{normalizar,azar,sorteo-util,login-errores}.test.mjs   node tests/<archivo> (sin dependencias)
 tests/reglas.emulador.mjs                            pruebas de reglas con emulador (ver README)
 tests/e2e/                                           pruebas de extremo a extremo con navegador + emuladores
 docs/CASOS_PRUEBA_REGLAS.md                          casos para el Rules Playground
@@ -66,7 +66,9 @@ Al **borrar** un participante hay que borrar también su `correos/{correo}` (mis
 
 Límites asumidos (documentados, no resueltos): la coincidencia es por **conjunto exacto de palabras significativas** (omitir un apellido o añadir un segundo nombre no coincide); los apóstrofos se eliminan sin dejar espacio (`O'Brien` → `obrien`); letras no descomponibles (ß, ø) se descartan; una clave vacía (p. ej. «de la») debe rechazarse. **Más colisiones:** al ignorar partículas y orden, «Ana de la Cruz» y «Ana Cruz» (o dos homónimos) comparten clave. `analizarLista` las detecta y **no guarda** esas claves hasta que la admin las resuelva (alta manual).
 
-Correo: minúsculas y sin espacios, debe terminar en `@alumnos.udg.mx` (`normalizarCorreo`, `esCorreoValido`). Nombre: se guarda recortado y con espacios colapsados, 5–100 caracteres (`limpiarNombre`, `validarNombre`).
+Correo: minúsculas y sin espacios, debe terminar en `@alumnos.udg.mx` (`normalizarCorreo`, `esCorreoValido`). Nombre: se guarda recortado y con espacios colapsados, 5–100 caracteres (`limpiarNombre`, `validarNombre`) y **sin `< > &` ni comillas** (`" ' ` “ ” ‘ ’`; `CARACTERES_PROHIBIDOS`). Por eso un nombre con apóstrofo (p. ej. D'Angelo) se rechaza: escríbelo sin él.
+
+**Carga de la lista (`limpiarLineaLista` / `analizarLista`):** cada línea se limpia antes de validarla y guardarla: se quitan comillas de CSV, viñetas o asteriscos iniciales (`• * - – +`), numeración (`1.`, `2)`) y puntos, comas o punto y coma finales; los puntos interiores se conservan. El nombre oficial se guarda **tal cual viene** (p. ej. en MAYÚSCULAS y sin acentos); el formato título es solo de presentación. La vista previa del panel muestra el total leído y los 3 primeros con la máscara.
 
 > `js/normalizar.js` y `firestore.rules` validan lo mismo en dos lenguajes (`RE_CORREO` ↔ `correoValido`, longitudes, patrón de clave). Si se cambia uno, cambiar el otro y correr ambas suites.
 
@@ -75,6 +77,7 @@ Correo: minúsculas y sin espacios, debe terminar en `@alumnos.udg.mx` (`normali
 Resumen (el detalle comentado está en `firestore.rules`):
 
 - **Público (sin sesión):** solo **crear** `participantes` + `correos` en un batch, y solo si `registroAbierto == true`, la clave existe en `lista`, ID == campo `clave`, el doc no existe, campos exactamente `nombre, clave, correo, origen, creadoEn`, correo válido, `origen == "registro"`, `creadoEn == request.time`, y ambos docs se crean juntos apuntando a la misma clave (`existsAfter`/`getAfter`). Solo puede **leer** `config/estado`.
+- **Nombre** (`nombreValido`, en `lista` y `participantes`): 5–100 caracteres, sin espacio en los bordes y sin `< > &` ni comillas. Las reglas no pueden comprobar que `nombre` corresponda a `clave`; esto evita al menos que se guarde marcado HTML bajo la clave de otra persona.
 - **Admin:** lee todo; CRUD en `lista`; crea (origen `"admin"`, mismas validaciones de formato, sin exigir registro abierto ni lista) y borra en `participantes`/`correos`; escribe `config/estado`; crea `sorteos` (con `adminUid` igual a su UID) y puede borrarlos (solo para el vaciado final). No hay `update` de participantes ni de sorteos.
 - Todo lo demás: denegado.
 
@@ -94,17 +97,24 @@ Firestore devuelve **siempre** `permission-denied`, sin distinguir causa. Por ta
 
 ## Autenticación de admin
 
-El login muestra «Usuario» y «Contraseña». El usuario válido es **`admin123`** (`ADMIN_USUARIO`, sin distinguir mayúsculas, recortado); solo entonces se llama a `signInWithEmailAndPassword(auth, ADMIN_CORREO, contraseña)` con `ADMIN_CORREO = admin@admin.admin`. **Cualquier otro usuario (incluido el correo directo) se rechaza antes de llamar a Firebase.** Usuario o contraseña incorrectos dan el mismo mensaje. **La contraseña no existe en el código**: solo se teclea. Tras autenticar, `getDoc(admins/{uid})`; inexistente o `permission-denied` ⇒ cerrar sesión. `panel.html` y `sorteo.html` redirigen a `login.html` sin sesión de admin (`requerirAdmin`).
+El login muestra «Usuario» y «Contraseña». El usuario válido es **`admin123`** (`ADMIN_USUARIO`, sin distinguir mayúsculas, recortado); solo entonces se llama a `signInWithEmailAndPassword(auth, ADMIN_CORREO, contraseña)` con `ADMIN_CORREO = admin@admin.admin`. El usuario se normaliza con `trim` y minúsculas antes de compararlo (`normalizarUsuario`). **Cualquier otro usuario (incluido el correo directo) se rechaza antes de llamar a Firebase.** Los campos del login llevan `autocapitalize="none" autocorrect="off" spellcheck="false"` (el usuario, además, `autocomplete="username"`). **Errores (`js/login-errores.js`):** usuario o contraseña incorrectos —y cualquier error de credenciales— dan el mismo mensaje y nunca revelan cuál falló; los errores de configuración o red tienen mensajes propios (dominio no autorizado, método de acceso desactivado, sin conexión, clave de API rechazada o restringida, demasiados intentos) y el código de Firebase se registra con `console.error` (solo el código: jamás la contraseña). Ojo: el login con correo y contraseña normalmente **no** valida el «dominio autorizado»; la causa más probable de un bloqueo es una restricción de referentes mal escrita en la clave de API. **La contraseña no existe en el código**: solo se teclea. Tras autenticar, `getDoc(admins/{uid})`; inexistente o `permission-denied` ⇒ cerrar sesión. `panel.html` y `sorteo.html` redirigen a `login.html` sin sesión de admin (`requerirAdmin`).
 
 ## Sorteo y proyección (Paso 3: `js/sorteo.js`, `js/escena.js`, `js/sorteo-util.js`)
 
 - **Elección:** `crypto.getRandomValues` con **muestreo por rechazo** (`js/azar.js`, sin sesgo de módulo). **Nunca `Math.random`** (ni en la animación: el azar visual usa un PRNG sembrado con `crypto`). `grep Math.random js/` solo debe encontrar comentarios.
 - **Orden:** se elige y se **guarda antes** de animar; si el guardado falla no se revela a nadie y se reintenta. `sorteos` guarda `fecha` (= `serverTimestamp()`), `totalParticipantes` (= tamaño del grupo elegible en esa ronda, tras excluir ganadores previos), `ganadorClave`, `ronda` y `adminUid`.
 - **«Volver a sortear»** (botón o Espacio): vuelve a sortear **al instante** excluyendo a los ganadores previos guardados y suma una ronda. **Casilla «Ensayo»:** anima sin guardar, con etiqueta «ENSAYO · no se guarda»; los ganadores de ensayo solo se excluyen entre sí durante esa sesión de pantalla. Los sorteos guardados no se editan y solo se borran con «Vaciar datos»: **ensaya siempre con la casilla marcada**.
-- **Nombre en pantalla:** siempre el **oficial** (`lista/{clave}.nombre`; si la clave no está en la lista —alta manual—, el capturado, con aviso al admin), nunca el tecleado en el registro. Se muestra una **máscara** `Nombre I. I.` (`enmascararNombre`: primera palabra + iniciales de las demás, sin partículas). **No lleva dígitos de código: no existe código de estudiante.** Asume que la lista oficial se escribe «Nombre Apellidos»; si no, el botón/tecla «Mostrar nombre completo» (N) revela el oficial.
+- **Nombre en pantalla:** siempre el **oficial** (`lista/{clave}.nombre`; si la clave no está en la lista —alta manual—, el capturado, con aviso al admin), nunca el tecleado en el registro. La lista viene en MAYÚSCULAS, sin acentos y como «Nombre Apellidos» (3 a 6 palabras): la **máscara** está en **formato título** (`enmascararNombre`: primera palabra = nombre de pila; las demás aportan inicial, **excepto** `de, del, la, las, los, y`): «MARTA ELENA RIOS Y VEGA SOTO» → «Marta E. R. V. S.»; «JULIO DE BELEN ORTIZ PAZ» → «Julio B. O. P.». La tecla **N** (o el botón) muestra el nombre completo, también en formato título (`formatoTitulo`: «Marta Elena Rios y Vega Soto»). **No lleva dígitos de código: no existe código de estudiante.** Si alguna vez la lista viniera como «Apellidos Nombre», la máscara mostraría un apellido.
 - **Modo proyección:** `sorteo.html` en pantalla completa (botón o **F**); los mandos se ocultan a los 3 s sin actividad y reaparecen al mover el ratón/tocar. Espacio/Enter = sortear. En pantallas < 640 px los mandos van bajo la escena. iOS no permite pantalla completa de un elemento: usar laptop.
 - **Guion de la animación (≈ 11,4 s; Canvas 2D sin librerías, ~60 fps con 100 participantes):** E1 repertorio 0–2,2 s (un linfocito B por participante, sin nombres) · E2 el antígeno (libro) explora 2,2–6,0 s · E3 reconocimiento 6,0–8,2 s (se une a UN clon; los demás se desvanecen) · E4 expansión clonal 8,2–11,4 s (1→2→4→8→16 en verde, anillo, nombre al ~45 %). `prefers-reduced-motion`: sin movimiento ni libro, fundido a la escena final (~1 s). Tope visual de 300 células (el sorteo usa a todos). Vocabulario y límites biológicos: ver «Metáfora visual».
 - **Constancia:** el panel descarga `registro-sorteo-AAAA-MM-DD.txt` (fecha, ronda, total, ganador oficial, UID del admin; `textoRegistroSorteo`). Debe descargarse **antes** de «Vaciar datos».
+
+## Seguridad de salida (XSS)
+
+- **Regla:** ningún dato de Firestore ni del usuario (nombre, correo, nombre oficial) se inserta con `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`, plantillas HTML ni atributos `on*`. Siempre `textContent` o `h()` (`js/ui.js`), cuyos hijos son nodos de texto; `h()` además lanza error ante `on*` que no sea función, `srcdoc` o URLs `javascript:`. Los datos solo llegan a atributos como valor de `aria-label`.
+- **Auditoría:** `grep -rnE "innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function|srcdoc|javascript:" js/ *.html` debe devolver solo comentarios. Repetirla ante cualquier cambio de interfaz.
+- **Defensa en profundidad:** `nombreValido` (cliente y reglas) rechaza `< > &` y comillas. Pruebas e2e: registro con `<img src=x onerror=alert(1)>` (se rechaza, no se ejecuta) y datos **ya guardados** con ese marcado (nombre, nombre oficial y correo) se muestran como texto en el panel y en el sorteo.
+- Posible mejora futura (no aplicada para no arriesgar el sitio sin poder probarla contra Firebase real): una `Content-Security-Policy` por `<meta>`.
 
 ## Interfaz (Paso 2)
 
@@ -144,7 +154,8 @@ Guía de textos y animación:
 ```bash
 node tests/normalizar.test.mjs                      # normalización (sin dependencias)
 node tests/azar.test.mjs                            # aleatoriedad (sin dependencias)
-node tests/sorteo-util.test.mjs                     # máscara y registro descargable (sin dependencias)
+node tests/sorteo-util.test.mjs                     # máscara, formato título y registro descargable (sin dependencias)
+node tests/login-errores.test.mjs                   # clasificación y mensajes de errores del login (sin dependencias)
 # Pruebas de reglas (requiere Java; ver README):
 npm i --no-save firebase-tools @firebase/rules-unit-testing firebase
 npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/reglas.emulador.mjs"

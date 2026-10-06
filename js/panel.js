@@ -8,7 +8,7 @@ import {
 import {
   analizarLista, claveDeNombre, compararConOficial, mensajeErrorNombre, mensajeErrorCorreo, normalizarCorreo,
 } from "./normalizar.js";
-import { textoRegistroSorteo, nombreArchivoRegistro } from "./sorteo-util.js";
+import { textoRegistroSorteo, nombreArchivoRegistro, enmascararNombre } from "./sorteo-util.js";
 import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo } from "./ui.js";
 
 const msg = $("#aviso");
@@ -135,8 +135,14 @@ $("#analizar").addEventListener("click", revisarLista);
 function revisarLista() {
   vistaPrevia = analizarLista($("#texto-lista").value);
   const r = vistaPrevia, cont = $("#vista-previa");
-  const bloques = [h("p", {}, h("b", {}, `${r.validos.length} nombres listos para guardar.`),
-    r.repetidos ? ` ${r.repetidos} línea(s) repetida(s) se ignoran.` : "")];
+  const bloques = [
+    h("p", {}, h("b", {}, `Se leyeron ${r.total} nombres.`), ` ${r.validos.length} listos para guardar.`,
+      r.repetidos ? ` ${r.repetidos} línea(s) repetida(s) se ignoran.` : ""),
+  ];
+  if (r.validos.length) bloques.push(h("div", {},
+    h("p", { class: "suave" }, "Vista previa (los 3 primeros, como se verán en pantalla):"),
+    h("ul", { id: "muestra-lista" }, r.validos.slice(0, 3).map((v) =>
+      h("li", {}, h("b", {}, enmascararNombre(v.nombre)), h("span", { class: "suave" }, `  ← se guardará como «${v.nombre}»`))))));
   if (r.colisiones.length) bloques.push(
     h("div", { class: "aviso aviso-aviso" }, h("b", {}, `${r.colisiones.length} colisión(es) NO se guardarán`),
       " (nombres distintos con la misma clave; distínguelos o resuélvelos con alta manual):",

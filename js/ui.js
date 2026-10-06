@@ -7,9 +7,15 @@ export function h(tag, props = {}, ...hijos) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props)) {
     if (v == null || v === false) continue;
-    if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
-    else if (k === "class") el.className = v;
-    else el.setAttribute(k, v === true ? "" : v);
+    if (k.startsWith("on")) {
+      if (typeof v !== "function") throw new TypeError(`h(): el manejador ${k} debe ser una función`);
+      el.addEventListener(k.slice(2), v);
+    } else if (k === "class") el.className = v;
+    else {
+      // Defensa en profundidad: ni srcdoc ni URLs javascript: aunque algún día un dato llegara a un atributo.
+      if (k === "srcdoc" || (["href", "src", "action", "formaction"].includes(k) && /^\s*javascript:/i.test(String(v)))) throw new TypeError(`h(): atributo ${k} no permitido`);
+      el.setAttribute(k, v === true ? "" : v);
+    }
   }
   for (const hijo of hijos.flat()) if (hijo != null && hijo !== false) el.append(hijo);
   return el;

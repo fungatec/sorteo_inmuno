@@ -5,6 +5,19 @@ const plano = (t) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 const capitalizar = (p) => p.charAt(0).toLocaleUpperCase("es") + p.slice(1).toLocaleLowerCase("es");
 
 /**
+ * Formato título para mostrar el nombre oficial (la lista viene en MAYÚSCULAS y sin acentos):
+ * "MARTA ELENA RIOS Y VEGA SOTO" → "Marta Elena Rios y Vega Soto". Las partículas
+ * (de, del, la, las, los, y) van en minúscula salvo al inicio; los guiones capitalizan cada parte.
+ * Solo es para mostrar: lo guardado en la lista no cambia.
+ */
+export function formatoTitulo(nombre) {
+  return limpiarNombre(nombre).split(" ").filter(Boolean).map((p, i) => {
+    if (i > 0 && PARTICULAS.has(plano(p))) return p.toLocaleLowerCase("es");
+    return p.split("-").map(capitalizar).join("-");
+  }).join(" ");
+}
+
+/**
  * Máscara pública del nombre OFICIAL: primera palabra completa (nombre de pila) + iniciales de las
  * demás palabras, sin partículas. "Julián Ramírez Soto" → "Julián R. S.".
  * Asume que la lista oficial escribe "Nombre Apellidos"; si no, el botón «Mostrar nombre completo»

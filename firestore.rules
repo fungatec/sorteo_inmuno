@@ -54,11 +54,19 @@ service cloud.firestore {
         && correo.matches('^[a-z0-9][a-z0-9._%+-]*@alumnos[.]udg[.]mx$');
     }
 
-    // 5-100 caracteres, sin espacio al inicio ni al final (el cliente recorta).
+    // 5-100 caracteres, sin espacio al inicio ni al final (el cliente recorta) y SIN < > & ni comillas
+    // (rectas ' ", acento grave ` y tipográficas “ ” ‘ ’). Las reglas no pueden recalcular la clave desde
+    // el nombre, así que sin esto alguien podría guardar marcado HTML como `nombre` bajo la clave de otra
+    // persona. La interfaz ya inserta todo con textContent; esto es defensa en profundidad.
+    // Debe coincidir con CARACTERES_PROHIBIDOS de js/normalizar.js. (Tres literales: uno con " , otro con ' y `, y las
+    // tipográficas con escapes \u, porque el compilador de reglas no acepta esos caracteres escritos tal cual.)
     function nombreValido(nombre) {
       return nombre is string
         && nombre.size() >= 5 && nombre.size() <= 100
-        && nombre.matches('^[^ ].*[^ ]$');
+        && nombre.matches('^[^ ].*[^ ]$')
+        && !nombre.matches('.*[<>&"].*')
+        && !nombre.matches(".*['`].*")
+        && !nombre.matches('.*[\u201C\u201D\u2018\u2019].*');
     }
 
     // Documento participantes/{clave}. `origen` fija quién lo crea ("registro"|"admin").

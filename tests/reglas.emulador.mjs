@@ -47,6 +47,24 @@ await sembrar();
 await prueba("público: registro válido (nombre en lista)", async () => assertSucceeds(registrar(publico(), JON)));
 await sembrar();
 await prueba("público: nombre fuera de lista", () => assertFails(registrar(publico(), { clave: "perez-pedro", nombre: "Pedro Pérez", correo: "pedro@alumnos.udg.mx" })));
+// Marcado HTML / comillas en `nombre`: antes del endurecimiento esto SÍ se aceptaba bajo la clave de otra persona.
+const MALOS = ["<img src=x onerror=alert(1)>", "Ana <b>López</b>", "Ana & López", 'Ana "Lola" López', "Ana 'Lola' López",
+  "Ana `López`", "Ana “López” Soto", "Ana ‘López’ Soto", "Ana López >"];
+for (const malo of MALOS)   // cada caso parte de datos limpios: así solo el contenido del nombre puede causar el rechazo
+  await prueba(`público: nombre con marcado/comillas rechazado → ${malo}`, async () => { await sembrar(); await assertFails(registrar(publico(), { ...JON, nombre: malo })); });
+await prueba("admin: alta manual y lista rechazan nombres con marcado/comillas", async () => {
+  for (const malo of MALOS) {
+    await assertFails(registrar(admin(), { clave: "perez-pedro", nombre: malo, correo: "pedro@alumnos.udg.mx", origen: "admin" }));
+    await assertFails(setDoc(doc(admin(), "lista", "ruiz-ana"), { nombre: malo }));
+  }
+});
+await prueba("nombres legítimos siguen aceptándose (acentos, ñ, guion, punto, mayúsculas)", async () => {
+  await sembrar();
+  await assertSucceeds(registrar(publico(), { ...JON, nombre: "JULIÁN RAMÍREZ SOTO" }));
+  await sembrar();
+  await assertSucceeds(setDoc(doc(admin(), "lista", "pena-ana-gil"), { nombre: "Ana M. Peña-Gil" }));
+});
+await sembrar();
 await prueba("público: correo @gmail", () => assertFails(registrar(publico(), { ...JON, correo: "julian@gmail.com" })));
 await prueba("público: correo con mayúsculas/espacios", () => assertFails(registrar(publico(), { ...JON, correo: "Julian@alumnos.udg.mx" })));
 await prueba("público: duplicado por nombre", () => assertFails(registrar(publico(), { clave: "lopez-maria", nombre: "María López", correo: "otra@alumnos.udg.mx" })));

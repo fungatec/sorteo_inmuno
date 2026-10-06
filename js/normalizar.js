@@ -34,9 +34,15 @@ export function limpiarNombre(nombre) {
   return String(nombre ?? "").replace(/\s+/g, " ").trim();
 }
 
+// Caracteres que nunca se aceptan en un nombre: < > & y comillas (rectas, tipográficas y acento grave).
+// Debe coincidir con nombreValido() de firestore.rules. Defensa en profundidad contra inyección de HTML:
+// la interfaz ya usa textContent, pero así tampoco se guardan datos con marcado.
+export const CARACTERES_PROHIBIDOS = /[<>&"'`\u201C\u201D\u2018\u2019]/;
+
 /** Devuelve "" si es válido, o un mensaje de error en español. */
 export function validarNombre(nombre) {
   const n = limpiarNombre(nombre);
+  if (CARACTERES_PROHIBIDOS.test(n)) return "El nombre no puede contener los caracteres < > & ni comillas.";
   if (n.length < NOMBRE_MIN || n.length > NOMBRE_MAX) {
     return `El nombre debe tener entre ${NOMBRE_MIN} y ${NOMBRE_MAX} caracteres.`;
   }
@@ -73,19 +79,33 @@ export function compararConOficial(tecleado, oficial, clave) {
 }
 
 /**
+ * Limpia una línea pegada desde un documento: quita comillas de CSV, viñetas o asteriscos y numeración
+ * iniciales ("• ", "* ", "- ", "1. ", "2) ") y puntos, comas o punto y coma finales.
+ */
+export function limpiarLineaLista(linea) {
+  return limpiarNombre(
+    String(linea ?? "")
+      .replace(/^[\s"'\u201C\u2018]+|[\s"'\u201D\u2019]+$/g, "")
+      .replace(/^(?:[\s\u2022\u00B7\u25AA\u25E6\u2023\u2043*+>\-\u2013\u2014]+|\d{1,3}\s*[.)]\s+)+/, "")
+      .replace(/[\s.,;]+$/, ""),
+  );
+}
+
+/**
  * Analiza el texto de la lista de la clase (un nombre por línea) sin tocar Firebase.
- * Devuelve { validos: [{clave, nombre}], rechazados: [{linea, texto, motivo}],
+ * Devuelve { total, validos: [{clave, nombre}], rechazados: [{linea, texto, motivo}],
  *            colisiones: [{clave, nombres}], repetidos }.
- * Las claves en colisión (nombres distintos con la misma clave) NO se incluyen en
- * `validos`: la admin debe distinguirlas a mano. Líneas idénticas se cuentan como repetidos.
+ * `total` = líneas con contenido leídas. Las claves en colisión (nombres distintos con la misma clave)
+ * NO se incluyen en `validos`: la admin debe distinguirlas a mano. Líneas idénticas cuentan como repetidos.
  */
 export function analizarLista(texto) {
   const porClave = new Map(); // clave -> [nombres distintos]
   const rechazados = [];
-  let repetidos = 0;
+  let repetidos = 0, total = 0;
   String(texto ?? "").replace(/^\uFEFF/, "").split(/\r?\n/).forEach((crudo, i) => {
-    const nombre = limpiarNombre(crudo.replace(/^["']+|["']+$/g, ""));
+    const nombre = limpiarLineaLista(crudo);
     if (!nombre) return;
+    total++;
     const error = validarNombre(nombre);
     if (error) { rechazados.push({ linea: i + 1, texto: nombre, motivo: error }); return; }
     const clave = claveDeNombre(nombre);
@@ -98,7 +118,7 @@ export function analizarLista(texto) {
     if (nombres.length === 1) validos.push({ clave, nombre: nombres[0] });
     else colisiones.push({ clave, nombres });
   }
-  return { validos, rechazados, colisiones, repetidos };
+  return { total, validos, rechazados, colisiones, repetidos };
 }
 
 /** Mensajes para validación en vivo. Devuelven "" si el valor es válido. */

@@ -5,12 +5,12 @@ Para las pruebas usa **nombres ficticios** (no cargues todavía la lista real).
 
 ## A · Firebase (consola de `sorteoinmuno`)
 
-- [ ] **Reglas publicadas:** Firestore → Reglas → pegar **todo** `firestore.rules` de esta rama → Publicar. (Cambiaron en el Paso 2 —admin puede borrar `sorteos`— y en el Paso 3 —`sorteos` exige `adminUid`—; sin esta versión el sorteo y «Vaciar datos» fallan.) Anota la fecha/hora que muestra «Última publicación».
+- [ ] **Reglas publicadas:** Firestore → Reglas → pegar **todo** `firestore.rules` de esta rama → Publicar. (Cambiaron en el Paso 2 —admin puede borrar `sorteos`—, en el Paso 3 —`sorteos` exige `adminUid`— y ahora —los nombres no pueden llevar `< > &` ni comillas—; sin esta versión el sorteo y «Vaciar datos» fallan y la carga de la lista rechaza líneas con apóstrofos.) Anota la fecha/hora que muestra «Última publicación».
 - [ ] **`config/estado`** existe con `registroAbierto` = `false` (boolean).
 - [ ] **`admins/i0y2lNrbtRed5L7dTIUFTLSKeQr1`** existe (cualquier campo).
 - [ ] **Contraseña de la cuenta admin fuerte** (Authentication → Usuarios → `admin@admin.admin`). Usuario en el login: `admin123`. Compártela solo con la maestra, fuera del repositorio y del chat del grupo.
 - [ ] **Dominio autorizado:** Authentication → Configuración → Dominios autorizados → `fungatec.github.io`.
-- [ ] *(Recomendado)* Google Cloud → APIs y servicios → Credenciales → clave de API web → restricción de referentes HTTP: `https://fungatec.github.io/*`.
+- [ ] *(Recomendado, con cuidado)* Google Cloud → APIs y servicios → Credenciales → clave de API web → restricción de referentes HTTP: `https://fungatec.github.io/*`. **Si te equivocas aquí se rompe todo** (login, registro y sorteo fallan con «clave de API rechazada»): después de guardarla, repite la prueba C completa. Si algo falla, quita la restricción y vuelve a probar.
 - [ ] *(Opcional)* Prueba rápida de reglas en el Rules Playground con `docs/CASOS_PRUEBA_REGLAS.md`; borra los documentos de prueba.
 
 ## B · GitHub Pages
@@ -28,8 +28,9 @@ Para las pruebas usa **nombres ficticios** (no cargues todavía la lista real).
 Necesitas: un celular **con datos móviles** (no la Wi-Fi del evento), una laptop y, si puedes, el proyector real.
 
 1. [ ] **Login** (laptop o celular): `login.html` → Usuario `admin123` + contraseña. Entra al panel.
-   - [ ] Con otro usuario (p. ej. `admin`) o contraseña mala: «Usuario o contraseña incorrectos».
-2. [ ] **Lista de prueba:** Panel → Lista de la clase → pega 6 nombres ficticios, uno con guion (`Ana Pérez-Gil`), uno con partícula (`Rosa de los Ríos Mora`), y uno repetido con otro orden → *Revisar lista*. Comprueba que detecta la colisión y que **no** la guarda. Guarda.
+   - [ ] Con otro usuario (p. ej. `admin`) o contraseña mala: «Usuario o contraseña incorrectos» (el mismo mensaje en ambos casos). El usuario con espacios o en mayúsculas (`  ADMIN123`) sí entra.
+   - [ ] Si ves un mensaje de «clave de API», «método de acceso desactivado», «dominio no autorizado» o «sin conexión», es de configuración o red, no de la contraseña; abre la consola del navegador (F12) y busca `[login] error de Firebase:` para ver el código.
+2. [ ] **Lista de prueba:** Panel → Lista de la clase → pega 6 nombres ficticios en MAYÚSCULAS y sin acentos, algunos con viñeta o punto final (`• ANA PEREZ-GIL.`), uno con partícula (`ROSA DE LOS RIOS MORA`), y uno repetido con otro orden → *Revisar lista*. Comprueba el total leído, que la vista previa muestre los 3 primeros con la máscara (`Ana P. G.`…), que detecte la colisión y que **no** la guarde. Guarda y confirma en Firestore que el nombre quedó **sin** viñeta ni punto.
 3. [ ] **Abrir el registro** (interruptor del panel).
 4. [ ] **En el celular** abre el enlace de Pages y prueba:
    - [ ] Registro válido con un nombre de la lista (otro orden, sin acentos) y un correo `@alumnos.udg.mx` → ves «Tu clon quedó en el repertorio».
@@ -42,8 +43,8 @@ Necesitas: un celular **con datos móviles** (no la Wi-Fi del evento), una lapto
 5. [ ] **Cerrar el registro** en el panel → recarga el celular: «El registro está cerrado».
 6. [ ] **Panel:** *Participantes* muestra el **nombre oficial**; si alguien tecleó distinto sale «escrito distinto»; la búsqueda encuentra sin acentos; *Alta manual* agrega a alguien aunque esté cerrado; *Eliminar* lo quita.
 7. [ ] **Sorteo (ensayo):** `sorteo.html` → marca *Ensayo* → *Liberar el antígeno*.
-   - [ ] Dura entre 8 y 12 s, con las 4 escenas; sale una **máscara** (`Nombre I. I.`), no el nombre completo.
-   - [ ] *Mostrar nombre completo* (o tecla **N**) muestra el nombre **oficial** de la lista.
+   - [ ] Dura entre 8 y 12 s, con las 4 escenas; sale una **máscara en formato título** (`Marta E. R. V. S.`), no el nombre completo.
+   - [ ] *Mostrar nombre completo* (o tecla **N**) muestra el nombre **oficial** de la lista en formato título (`Marta Elena Rios y Vega Soto`).
    - [ ] *Volver a sortear* (o **Espacio**) elige a otra persona.
    - [ ] **Pantalla completa** (tecla **F**) en la laptop y, si hay, en el proyector: se ve nítido, los botones se ocultan a los 3 s y reaparecen al mover el ratón.
 8. [ ] **Sorteo real de prueba:** desmarca *Ensayo*, sortea una vez → en Firestore aparece `sorteos/…` con `fecha`, `totalParticipantes`, `ganadorClave`, `ronda`, `adminUid`.

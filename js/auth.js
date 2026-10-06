@@ -3,10 +3,11 @@ import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https:/
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { auth, db } from "./firebase.js";
 import { ADMIN_USUARIO, ADMIN_CORREO } from "./firebase-config.js";
+import { normalizarUsuario } from "./login-errores.js";
 
-/** Correo interno para el usuario escrito, o null si no es el usuario admin. */
+/** Correo interno para el usuario escrito (sin espacios en los bordes y en minúsculas), o null si no es el admin. */
 export function correoDeUsuario(usuario) {
-  return String(usuario ?? "").trim().toLowerCase() === ADMIN_USUARIO ? ADMIN_CORREO : null;
+  return normalizarUsuario(usuario) === normalizarUsuario(ADMIN_USUARIO) ? ADMIN_CORREO : null;
 }
 
 /** Admin ⇔ existe admins/{uid}. Cualquier error (incluido permission-denied) cuenta como "no". */
