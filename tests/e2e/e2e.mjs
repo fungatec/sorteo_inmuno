@@ -10,7 +10,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { extname, join } from "node:path";
 import assert from "node:assert/strict";
 
-const REPO = new URL("../..", import.meta.url).pathname.replace(/\/$/, ""), PORT = 8000, BASE = `http://localhost:${PORT}`;
+const REPO = process.env.REPO ?? new URL("../..", import.meta.url).pathname.replace(/\/$/, ""), PORT = 8000, BASE = `http://localhost:${PORT}`;
 const TIPOS = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" };
 const FB = readFileSync(new URL("./fb.js", import.meta.url));
 const server = http.createServer((req, res) => {
@@ -69,9 +69,27 @@ const DENEGADO = /avisa a la maestra/;
   const p = await nuevaPagina();
   await p.goto(`${BASE}/index.html?emulador`);
   await prueba("registro: muestra 'Registro abierto'", async () => { await p.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto"); });
-  await prueba("registro: correo @gmail se rechaza en el cliente", async () => {
-    await p.fill("#nombre", "Jonathan Gómez Peregrina"); await p.fill("#correo", "jon@gmail.com"); await p.click("#enviar");
-    assert.match(await p.textContent("#aviso"), /@alumnos\.udg\.mx/);
+  await prueba("registro: aviso de privacidad de una línea", async () => {
+    assert.match(await p.textContent(".privacidad"), /solo para este sorteo y se eliminarán al terminar el evento/);
+  });
+  await prueba("registro: validación en vivo (correo @gmail) y se corrige sola", async () => {
+    await p.fill("#nombre", "Jonathan Gómez Peregrina");
+    await p.fill("#correo", "jon@gmail.com"); await p.press("#correo", "Tab");
+    assert.equal(await p.textContent("#correo-error"), "El correo debe ser @alumnos.udg.mx");
+    assert.equal(await p.getAttribute("#correo", "aria-invalid"), "true");
+    await p.click("#enviar");                                   // no envía
+    assert.equal(await p.locator("#listo:not([hidden])").count(), 0);
+    await p.fill("#correo", "jon@alumnos.udg.mx");
+    assert.equal(await p.isHidden("#correo-error"), true);
+  });
+  await prueba("registro: nombre muy corto muestra mensaje en vivo", async () => {
+    await p.fill("#nombre", "Ana"); await p.press("#nombre", "Tab");
+    assert.match(await p.textContent("#nombre-error"), /entre 5 y 100/);
+  });
+  await prueba("registro: sin desbordamiento horizontal a 360 px", async () => {
+    await p.setViewportSize({ width: 360, height: 740 });
+    assert.equal(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await p.setViewportSize({ width: 1280, height: 720 });
   });
   await prueba("registro: nombre fuera de lista → mensaje único con las 3 causas", async () => {
     await p.fill("#nombre", "Pedro Desconocido Pérez"); await p.fill("#correo", "pedro@alumnos.udg.mx"); await p.click("#enviar");
@@ -104,9 +122,9 @@ const DENEGADO = /avisa a la maestra/;
   });
   await sembrar("config/estado", { registroAbierto: false });
   const p3 = await nuevaPagina(); await p3.goto(`${BASE}/index.html?emulador`);
-  await prueba("registro cerrado: formulario deshabilitado y aviso", async () => {
+  await prueba("registro cerrado: 'El registro está cerrado' reemplaza al formulario", async () => {
     await p3.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro cerrado");
-    assert.equal(await p3.isDisabled("#enviar"), true); assert.match(await p3.textContent("#aviso"), /cerrado/);
+    assert.equal(await p3.isVisible("#registro"), false); assert.match(await p3.textContent("#cerrado"), /El registro está cerrado/);
   });
   await sembrar("config/estado", { registroAbierto: true });
   for (const pg of [p, p2, p3]) assert.deepEqual(pg.errores, [], "errores JS: " + pg.errores);
@@ -129,6 +147,15 @@ const DENEGADO = /avisa a la maestra/;
     await p.fill("#usuario", "admin123"); await p.fill("#contrasena", "mala"); await p.click("#entrar");
     await p.waitForFunction(() => /incorrectos/.test(document.querySelector("#aviso").textContent) && !document.querySelector("#entrar").disabled);
     assert.equal(p.authCalls, 1);
+  });
+  await prueba("login: cuenta sin documento en admins/ → 'Sin permisos de administrador' y sesión cerrada", async () => {
+    await fetch(`${FS}/admins/${UID}`, { method: "DELETE", headers: OWNER });
+    await p.fill("#usuario", "admin123"); await p.fill("#contrasena", "Clave-De-Prueba-9"); await p.click("#entrar");
+    await p.waitForFunction(() => /Sin permisos de administrador/.test(document.querySelector("#aviso").textContent));
+    assert.match(p.url(), /login\.html/);
+    await p.goto(`${BASE}/panel.html?emulador`); await p.waitForURL(/login\.html/);   // no quedó sesión
+    await sembrar(`admins/${UID}`, { activo: true });
+    await p.goto(`${BASE}/login.html?emulador`);
   });
   await prueba("login: admin123 + contraseña correcta → panel", async () => {
     await p.fill("#usuario", " Admin123 "); await p.fill("#contrasena", "Clave-De-Prueba-9"); await p.click("#entrar");
@@ -165,9 +192,10 @@ const DENEGADO = /avisa a la maestra/;
   });
   await prueba("panel: cerrar y abrir el registro", async () => {
     p.once("dialog", (d) => d.accept());
-    await p.click("#alternar"); await p.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro cerrado");
+    await p.click("#alternar"); await p.waitForFunction(() => document.querySelector("#etq-alternar").textContent === "Registro cerrado");
     assert.equal((await leer("config/estado")).fields.registroAbierto.booleanValue, false);
-    await p.click("#alternar"); await p.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto");
+    await p.click("#alternar"); await p.waitForFunction(() => document.querySelector("#etq-alternar").textContent === "Registro abierto");
+    assert.equal(await p.getAttribute("#alternar", "aria-checked"), "true");
   });
   await prueba("panel: cargar lista (colisión, rechazada, repetida) y guardar", async () => {
     await p.click("#tab-b-lista");
@@ -192,15 +220,34 @@ const DENEGADO = /avisa a la maestra/;
   });
   await prueba("panel: filtro 'solo advertencias' (excluye al alta manual sin advertencia de texto)", async () => {
     await p.click("#tab-b-participantes");
-    assert.equal(await p.locator("#participantes .fila").count(), 4);
+    assert.equal(await p.locator("#participantes tr").count(), 4);
     await p.check("#solo-alertas");
-    assert.equal(await p.locator("#participantes .fila").count(), 3);
+    assert.equal(await p.locator("#participantes tr").count(), 3);
     await p.uncheck("#solo-alertas");
+  });
+  await prueba("panel: búsqueda sin acentos ni mayúsculas, con contador", async () => {
+    await p.fill("#buscar", "GOMEZ");
+    assert.equal(await p.locator("#participantes tr").count(), 1);
+    assert.match(await p.textContent("#contador-tabla"), /Mostrando 1 de 4/);
+    await p.fill("#buscar", "alumnos.udg"); assert.equal(await p.locator("#participantes tr").count(), 4);
+    await p.fill("#buscar", "zzzz"); assert.match(await p.textContent("#participantes"), /Ningún participante coincide/);
+    await p.fill("#buscar", "");
+  });
+  await prueba("panel: pestañas operables con teclado (→, Fin, ←)", async () => {
+    await p.focus("#tab-b-participantes"); await p.keyboard.press("ArrowRight");
+    assert.equal(await p.getAttribute("#tab-b-lista", "aria-selected"), "true"); assert.equal(await p.isVisible("#tab-lista"), true);
+    await p.keyboard.press("End"); assert.equal(await p.getAttribute("#tab-b-alta", "aria-selected"), "true");
+    await p.keyboard.press("Home"); assert.equal(await p.getAttribute("#tab-b-participantes", "aria-selected"), "true");
+  });
+  await prueba("panel: alta manual valida en vivo (correo @gmail)", async () => {
+    await p.click("#tab-b-alta"); await p.fill("#alta-correo", "x@gmail.com"); await p.press("#alta-correo", "Tab");
+    assert.equal(await p.textContent("#alta-correo-error"), "El correo debe ser @alumnos.udg.mx");
+    await p.fill("#alta-correo", ""); await p.click("#tab-b-participantes");
   });
   await prueba("panel: eliminar participante borra también el índice de correo", async () => {
     await p.click("#tab-b-participantes");
     p.once("dialog", (d) => d.accept());
-    await p.locator("#participantes .fila", { hasText: "Pedro Fuera" }).locator("button").click();
+    await p.locator("#participantes tr", { hasText: "Pedro Fuera" }).locator("button").click();
     await p.waitForFunction(() => !/Pedro Fuera/.test(document.querySelector("#participantes").textContent));
     assert.equal(await leer("participantes/fuera-lista-pedro"), null); assert.equal(await leer("correos/pedro.fuera@alumnos.udg.mx"), null);
   });
@@ -260,6 +307,32 @@ const DENEGADO = /avisa a la maestra/;
     assert.equal(await a.locator(".clon.apagado").count(), 2);
   });
   assert.deepEqual(a.errores, []);
+  await s.close(); await a.close(); // Chromium limita las conexiones simultáneas por host
+  await prueba("panel y sorteo: sin desbordamiento horizontal a 360 px", async () => {
+    const m = await p.context().newPage(); await m.setViewportSize({ width: 360, height: 740 });
+    for (const pagina of ["panel", "sorteo"]) {
+      await m.goto(`${BASE}/${pagina}.html?emulador`); await m.waitForSelector("#contenido:not([hidden])"); await m.waitForTimeout(500);
+      assert.equal(await m.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true, pagina);
+    }
+    await m.close();
+  });
+  await prueba("vaciar datos: exige escribir BORRAR; cancelar no borra; confirmar deja todo vacío y el registro cerrado", async () => {
+    const w = await p.context().newPage(); await w.goto(`${BASE}/panel.html?emulador`);
+    await w.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
+    await w.click("#abrir-vaciar"); await w.waitForSelector("#dlg-vaciar[open]");
+    assert.equal(await w.isDisabled("#confirmar-vaciar"), true);
+    await w.fill("#confirmar-texto", "borrar"); assert.equal(await w.isDisabled("#confirmar-vaciar"), true);
+    await w.click("#cancelar-vaciar");
+    assert.ok((await listar("participantes")).length > 0 && (await listar("lista")).length > 0, "cancelar no debe borrar");
+    await w.click("#abrir-vaciar"); await w.fill("#confirmar-texto", "BORRAR");
+    assert.equal(await w.isDisabled("#confirmar-vaciar"), false);
+    await w.click("#confirmar-vaciar");
+    await w.waitForFunction(() => /Datos eliminados/.test(document.querySelector("#aviso").textContent));
+    for (const c of ["participantes", "correos", "sorteos", "lista"]) assert.equal((await listar(c)).length, 0, c);
+    assert.equal((await leer("config/estado")).fields.registroAbierto.booleanValue, false);
+    assert.ok(await leer(`admins/${UID}`), "admins no se toca");
+    await w.close();
+  });
   // cerrar sesión
   await prueba("salir: vuelve a login y las páginas de admin redirigen", async () => {
     await p.click("#salir"); await p.waitForURL(/login\.html/);

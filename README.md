@@ -11,11 +11,12 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 3. Abre el registro (botón en el panel) y comparte `https://fungatec.github.io/sorteo_inmuno/`.
 4. En el panel, *Participantes* muestra el nombre oficial y avisa si lo tecleado difiere o no corresponde; *Alta manual* cubre a quien no pudo registrarse.
 5. En el evento: cierra el registro, abre *Ir al sorteo*, haz un **ensayo** (casilla marcada) y luego los sorteos reales. Las rondas excluyen a los ganadores previos.
+6. **Al terminar el evento:** anota quién ganó y pulsa **Vaciar datos** en el panel (escribe `BORRAR`). Es lo que cumple el aviso de privacidad del registro («se eliminarán al terminar el evento»).
 
 ## Pasos manuales pendientes
 
 1. ~~Pegar la configuración de Firebase en `js/firebase-config.js`~~ — **hecho**.
-2. **Publicar las reglas:** Firebase Console → Firestore Database → **Reglas** → pegar el contenido completo de `firestore.rules` → **Publicar**.
+2. **Publicar las reglas** (otra vez, si ya las publicaste: el Paso 2 permite al admin borrar `sorteos` para «Vaciar datos»): Firebase Console → Firestore Database → **Reglas** → pegar el contenido completo de `firestore.rules` → **Publicar**. Sin esto, el vaciado falla al llegar a los sorteos.
 3. **Crear `config/estado`** (Firestore → Datos → *Iniciar colección* `config` → ID `estado` → campo `registroAbierto` tipo *boolean* = `false`). Sin este documento el registro queda cerrado (a propósito).
 4. **Autorizar el dominio:** Authentication → Configuración → **Dominios autorizados** → *Agregar dominio* → `fungatec.github.io` (solo el dominio, sin ruta ni `https://`; si el repositorio pasa a otro usuario/organización, usa su `<usuario>.github.io`).
 5. **Activar GitHub Pages:** repositorio → Settings → Pages → *Deploy from a branch* → rama `main`, carpeta `/ (root)`. Con plan gratuito el repositorio debe ser **público**. Enlace a compartir: `https://fungatec.github.io/sorteo_inmuno/`.
@@ -40,7 +41,7 @@ npx firebase emulators:exec --only firestore --project sorteoinmuno "node tests/
 
 (Si `firebase.json` no existe, el emulador usa los puertos por defecto; pasa `--config` o crea uno con `{"firestore":{"rules":"firestore.rules"}}`.)
 
-De extremo a extremo (navegador real + emuladores de Auth y Firestore, 27 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
+De extremo a extremo (navegador real + emuladores de Auth y Firestore, 36 casos con datos ficticios): ver la cabecera de `tests/e2e/e2e.mjs`.
 
 ## Desarrollo local
 

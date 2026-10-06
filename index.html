@@ -12,7 +12,8 @@
 </head>
 <body>
   <main>
-    <svg class="marca" viewBox="0 0 64 64" aria-hidden="true">
+    <div id="intro">
+      <svg class="marca" viewBox="0 0 64 64" aria-hidden="true">
       <g stroke="#053043" stroke-width="2.5" stroke-linecap="round" fill="none">
         <path d="M32 14V6M32 6l-4-4M32 6l4-4"/>
         <path d="M32 14V6M32 6l-4-4M32 6l4-4" transform="rotate(90 32 32)"/>
@@ -24,39 +25,60 @@
     </svg>
     <h1>Registra tu receptor</h1>
     <p class="lead">Cada linfocito B porta un receptor de especificidad única. Inscribe el tuyo para entrar al repertorio del sorteo del libro de Inmunobiología.</p>
+    </div>
 
     <p class="estado-registro" id="estado" aria-live="polite"><span class="punto" id="punto"></span><span id="estado-texto">Consultando…</span></p>
     <div id="aviso" class="aviso" hidden></div>
 
+    <section id="cerrado" class="tarjeta" hidden>
+      <h2>El registro está cerrado</h2>
+      <p class="suave">Si crees que es un error, avisa a la maestra.</p>
+    </section>
+
     <form id="registro" class="formulario" novalidate>
       <label for="nombre">Nombre completo
-        <span class="ayuda">Escríbelo como aparece en la lista de la clase; el orden de nombre y apellidos no importa.</span>
+        <span class="ayuda" id="nombre-ayuda">Escríbelo como aparece en la lista de la clase; el orden de nombre y apellidos no importa.</span>
       </label>
-      <input id="nombre" name="nombre" type="text" autocomplete="name" autocapitalize="words" minlength="5" maxlength="100" required>
+      <input id="nombre" name="nombre" type="text" autocomplete="name" autocapitalize="words" maxlength="100" required aria-describedby="nombre-ayuda nombre-error">
+      <p class="error-campo" id="nombre-error" hidden></p>
 
       <label for="correo">Correo institucional
-        <span class="ayuda">Debe terminar en @alumnos.udg.mx</span>
+        <span class="ayuda" id="correo-ayuda">Debe terminar en @alumnos.udg.mx</span>
       </label>
-      <input id="correo" name="correo" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="100" required placeholder="nombre.apellido@alumnos.udg.mx">
+      <input id="correo" name="correo" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="100" required placeholder="nombre.apellido@alumnos.udg.mx" aria-describedby="correo-ayuda correo-error">
+      <p class="error-campo" id="correo-error" hidden></p>
 
       <button type="submit" id="enviar">Inscribir mi clon</button>
+      <p class="privacidad">Tus datos se usan solo para este sorteo y se eliminarán al terminar el evento.</p>
     </form>
 
-    <section id="listo" class="clon-ok" hidden aria-live="polite">
-      <svg viewBox="0 0 120 120" aria-hidden="true">
-        <g stroke="#053043" stroke-width="2.5">
-          <circle class="proliferar" cx="38" cy="44" r="18" fill="#A7F0F3"/>
-          <circle class="proliferar" cx="82" cy="44" r="18" fill="#A7F0F3"/>
-          <circle class="proliferar" cx="38" cy="82" r="18" fill="#A7F0F3"/>
-          <circle class="proliferar" cx="82" cy="82" r="18" fill="#45AC4D"/>
+    <section id="listo" class="clon-ok" hidden>
+      <svg class="repertorio" viewBox="0 0 260 150" role="img" aria-label="Un nuevo linfocito B se incorpora al repertorio">
+        <defs>
+          <g id="cel">
+            <g stroke="#053043" stroke-width="2" stroke-linecap="round" fill="none">
+              <path d="M0-12v-7M0-19l-3-3M0-19l3-3"/>
+              <path d="M0-12v-7M0-19l-3-3M0-19l3-3" transform="rotate(90)"/>
+              <path d="M0-12v-7M0-19l-3-3M0-19l3-3" transform="rotate(180)"/>
+              <path d="M0-12v-7M0-19l-3-3M0-19l3-3" transform="rotate(270)"/>
+            </g>
+            <circle r="12" style="fill:var(--c,#A7F0F3)" stroke="#053043" stroke-width="2"/>
+            <circle r="4.5" fill="#053043"/>
+          </g>
+        </defs>
+        <g class="existentes">
+          <use href="#cel" x="34" y="105"/><use href="#cel" x="82" y="105"/>
+          <use href="#cel" x="178" y="105"/><use href="#cel" x="226" y="105"/>
+          <use href="#cel" x="58" y="58"/><use href="#cel" x="106" y="58"/>
+          <use href="#cel" x="154" y="58"/><use href="#cel" x="202" y="58"/>
         </g>
+        <g transform="translate(130 105)"><g class="nuevo"><use href="#cel" style="--c:#45AC4D"/></g></g>
       </svg>
       <h1 tabindex="-1">Tu clon quedó en el repertorio</h1>
       <p class="lead" id="listo-texto"></p>
     </section>
 
-    <p class="pie">Tu nombre y correo se usan solo para este sorteo. Participan únicamente alumnos de la clase.
-      <a href="login.html">Administración</a></p>
+    <p class="pie"><a href="login.html">Administración</a></p>
   </main>
   <script type="module" src="js/registro.js"></script>
 </body>

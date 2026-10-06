@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import {
   claveDeNombre, limpiarNombre, validarNombre, normalizarCorreo, esCorreoValido,
-  compararConOficial, analizarLista,
+  compararConOficial, analizarLista, mensajeErrorNombre, mensajeErrorCorreo,
 } from "../js/normalizar.js";
 
 const casos = [];
@@ -101,6 +101,17 @@ caso("analizarLista: válidos, rechazados, repetidos y colisiones", () => {
   assert.equal(r.repetidos, 1); // "ana lópez" repite a "Ana López"
   assert.equal(r.rechazados.length, 1); // "Ana" (3 caracteres)
   assert.deepEqual(r.colisiones.map((c) => c.clave).sort(), ["angeles-maria", "gil-luis-perez"]);
+});
+
+caso("mensajes de validación en vivo", () => {
+  assert.equal(mensajeErrorNombre("   "), "Escribe tu nombre completo.");
+  assert.match(mensajeErrorNombre("Ana"), /entre 5 y 100/);
+  assert.equal(mensajeErrorNombre("Ana López"), "");
+  assert.equal(mensajeErrorCorreo(""), "Escribe tu correo institucional.");
+  assert.equal(mensajeErrorCorreo("jon@gmail.com"), "El correo debe ser @alumnos.udg.mx");
+  assert.equal(mensajeErrorCorreo("jon@alumnos.udg.mx.com"), "El correo debe ser @alumnos.udg.mx");
+  assert.match(mensajeErrorCorreo("@alumnos.udg.mx"), /^Revisa el correo/);
+  assert.equal(mensajeErrorCorreo(" Jon.Gomez4016@Alumnos.UDG.mx "), "");
 });
 
 let fallos = 0;

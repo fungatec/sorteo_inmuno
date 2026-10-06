@@ -44,7 +44,7 @@ docs/CASOS_PRUEBA_REGLAS.md                          casos para el Rules Playgro
 | `correos/{correo}` | `clave` | Índice anti-duplicado de correo. Se escribe **en el mismo `writeBatch`** que el participante. |
 | `admins/{uid}` | — | Admin ⇔ su UID existe aquí. Se gestiona solo desde la consola. UID admin: `i0y2lNrbtRed5L7dTIUFTLSKeQr1`. |
 | `config/estado` | `registroAbierto` (bool) | Debe existir; si no, el registro queda cerrado (falla segura). |
-| `sorteos/{id}` | `fecha` (= serverTimestamp), `totalParticipantes`, `ganadorClave`, `ronda` | Inmutables. |
+| `sorteos/{id}` | `fecha` (= serverTimestamp), `totalParticipantes`, `ganadorClave`, `ronda` | No se editan. Solo el admin puede borrarlos, y únicamente lo hace «Vaciar datos». |
 
 Al **borrar** un participante hay que borrar también su `correos/{correo}` (mismo batch); las reglas no lo fuerzan.
 
@@ -73,7 +73,7 @@ Correo: minúsculas y sin espacios, debe terminar en `@alumnos.udg.mx` (`normali
 Resumen (el detalle comentado está en `firestore.rules`):
 
 - **Público (sin sesión):** solo **crear** `participantes` + `correos` en un batch, y solo si `registroAbierto == true`, la clave existe en `lista`, ID == campo `clave`, el doc no existe, campos exactamente `nombre, clave, correo, origen, creadoEn`, correo válido, `origen == "registro"`, `creadoEn == request.time`, y ambos docs se crean juntos apuntando a la misma clave (`existsAfter`/`getAfter`). Solo puede **leer** `config/estado`.
-- **Admin:** lee todo; CRUD en `lista`; crea (origen `"admin"`, mismas validaciones de formato, sin exigir registro abierto ni lista) y borra en `participantes`/`correos`; escribe `config/estado`; crea `sorteos`. No hay `update` de participantes ni de sorteos.
+- **Admin:** lee todo; CRUD en `lista`; crea (origen `"admin"`, mismas validaciones de formato, sin exigir registro abierto ni lista) y borra en `participantes`/`correos`; escribe `config/estado`; crea `sorteos` y puede borrarlos (solo para el vaciado final). No hay `update` de participantes ni de sorteos.
 - Todo lo demás: denegado.
 
 ### Errores en el registro (decisión de privacidad)
@@ -98,9 +98,16 @@ El login muestra «Usuario» y «Contraseña». El usuario válido es **`admin12
 
 - Aleatoriedad con `crypto.getRandomValues` y **muestreo por rechazo** (`js/azar.js`, sin sesgo de módulo); nunca `Math.random` (tampoco en la animación).
 - El ganador se elige **y se guarda antes** de la animación; si el guardado falla no se revela a nadie y se puede reintentar. `sorteos` guarda `totalParticipantes` (= tamaño del grupo elegible en esa ronda, tras excluir ganadores previos), `ganadorClave`, `ronda` y `fecha` = `serverTimestamp()`.
-- Rondas: se excluyen automáticamente los ganadores de rondas guardadas. **Casilla «Ensayo»:** sortea y anima sin guardar ni excluir, con etiqueta visible «ENSAYO · no se guarda». Los sorteos guardados son inmutables (las reglas no permiten borrarlos), así que **ensaya siempre con la casilla marcada**.
+- Rondas: se excluyen automáticamente los ganadores de rondas guardadas. **Casilla «Ensayo»:** sortea y anima sin guardar ni excluir, con etiqueta visible «ENSAYO · no se guarda». Los sorteos guardados no se pueden editar y solo se borran con «Vaciar datos», así que **ensaya siempre con la casilla marcada**.
 - Se muestra solo el **nombre oficial** del ganador (`lista/{clave}`; si la clave no está en la lista, el tecleado). Nunca correos ni la tabla completa.
 - Animación: acercamiento del antígeno → reconocimiento (parpadeo que se frena sobre un clon) → proliferación clonal (14 células) → nombre en verde. Respeta `prefers-reduced-motion` (revela directo).
+
+## Interfaz (Paso 2)
+
+- **Registro:** solo nombre completo y correo (no hay código de estudiante: ni el modelo ni las reglas lo admiten). Validación **en vivo** bajo cada campo (`validarEnVivo` + `mensajeErrorNombre`/`mensajeErrorCorreo`; p. ej. «El correo debe ser @alumnos.udg.mx»). Si `registroAbierto` es false, la tarjeta «El registro está cerrado» **reemplaza** al formulario. Una línea de privacidad: «Tus datos se usan solo para este sorteo y se eliminarán al terminar el evento» (solo es verdad si la admin usa «Vaciar datos»). Éxito: animación de un linfocito B (verde) incorporándose al repertorio.
+- **Panel:** interruptor accesible (`role="switch"`) de registro; tabla de participantes (nombre oficial, correo, origen, fecha) con búsqueda sin acentos y contador; pestañas operables con ← → Inicio Fin; alta manual con las mismas validaciones; eliminar con confirmación.
+- **Vaciar datos:** diálogo modal que exige escribir `BORRAR` (botón deshabilitado hasta entonces, y se re-verifica al enviar). Cierra el registro primero y borra `participantes`, `correos`, `sorteos` y `lista` (no toca `admins` ni `config`). Irreversible: incluye el registro de ganadores.
+- Accesibilidad: auditada con axe-core (WCAG 2.0/2.1 A y AA) a 360 px en las cuatro pantallas, sin violaciones. Responsivo desde 360 px (la tabla se apila en tarjetas bajo 640 px). Cualquier cambio de interfaz debe mantener esa auditoría en cero.
 
 ## Identidad visual
 

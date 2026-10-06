@@ -1,15 +1,25 @@
-// Panel de admin: estado del registro, lista de la clase, participantes y alta manual.
+// Panel de admin: estado del registro, participantes, lista de la clase, alta manual y vaciado final.
 import { configPendiente } from "./firebase.js";
 import { requerirAdmin, cerrarSesion } from "./auth.js";
 import {
   leerRegistroAbierto, fijarRegistroAbierto, leerColeccion, guardarLista, borrarDeLista,
-  crearParticipante, borrarParticipante, ErrorValidacion,
+  crearParticipante, borrarParticipante, vaciarDatos, ErrorValidacion,
 } from "./datos.js";
-import { analizarLista, claveDeNombre, compararConOficial } from "./normalizar.js";
-import { $, h, aviso, avisoConfigPendiente, fechaCorta } from "./ui.js";
+import {
+  analizarLista, claveDeNombre, compararConOficial, mensajeErrorNombre, mensajeErrorCorreo, normalizarCorreo,
+} from "./normalizar.js";
+import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo } from "./ui.js";
 
 const msg = $("#aviso");
 let lista = [], participantes = [], registroAbierto = null, vistaPrevia = null;
+
+// ------------------------------------------------------------------ datos derivados
+const oficial = (clave) => lista.find((l) => l.id === clave)?.nombre;
+const nombreMostrado = (p) => oficial(p.id) ?? p.nombre;
+const estadoNombre = (p) => compararConOficial(p.nombre, oficial(p.id), p.id);
+const hayAdvertencia = (p) => ["difiere", "no-corresponde"].includes(estadoNombre(p));
+/** Minúsculas y sin acentos, para que la búsqueda no distinga "Gómez" de "gomez". */
+const plano = (t) => String(t ?? "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 async function recargar() {
   try {
@@ -18,32 +28,31 @@ async function recargar() {
     ]);
     lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
     participantes.sort((a, b) => nombreMostrado(a).localeCompare(nombreMostrado(b), "es"));
-    aviso(msg, "");
   } catch {
     aviso(msg, "No se pudieron leer los datos. Revisa tu conexión y recarga la página.", "error");
   }
   pintar();
 }
 
-// ------------------------------------------------------------------ datos derivados
-const oficial = (clave) => lista.find((l) => l.id === clave)?.nombre;
-const nombreMostrado = (p) => oficial(p.id) ?? p.nombre;
-const estadoNombre = (p) => compararConOficial(p.nombre, oficial(p.id), p.id);
-const hayAdvertencia = (p) => ["difiere", "no-corresponde"].includes(estadoNombre(p));
+function pintar() { pintarEstado(); pintarResumen(); pintarParticipantes(); pintarLista(); }
 
-function pintar() {
-  pintarEstado(); pintarResumen(); pintarParticipantes(); pintarLista();
-}
-
+// ------------------------------------------------------------------ registro abierto/cerrado
 function pintarEstado() {
-  $("#punto").className = "punto " + (registroAbierto === true ? "abierto" : registroAbierto === false ? "cerrado" : "");
-  $("#estado-texto").textContent = registroAbierto === true ? "Registro abierto"
-    : registroAbierto === false ? "Registro cerrado" : "Estado no disponible (¿existe config/estado?)";
   const b = $("#alternar");
-  b.textContent = registroAbierto === true ? "Cerrar el registro" : "Abrir el registro";
-  b.className = registroAbierto === true ? "secundario" : "exito";
-  b.style.color = "var(--petroleo)";
+  b.disabled = registroAbierto === null;
+  b.setAttribute("aria-checked", String(registroAbierto === true));
+  $("#etq-alternar").textContent = registroAbierto === true ? "Registro abierto"
+    : registroAbierto === false ? "Registro cerrado" : "Estado no disponible (¿existe config/estado?)";
 }
+
+$("#alternar").addEventListener("click", async () => {
+  const objetivo = registroAbierto !== true;
+  if (!objetivo && !confirm("¿Cerrar el registro? Nadie más podrá inscribirse.")) return;
+  $("#alternar").disabled = true;
+  try { await fijarRegistroAbierto(objetivo); registroAbierto = objetivo; aviso(msg, ""); }
+  catch { aviso(msg, "No se pudo cambiar el estado del registro.", "error"); }
+  pintarEstado();
+});
 
 function pintarResumen() {
   const inscritosDeLista = participantes.filter((p) => oficial(p.id)).length;
@@ -53,51 +62,59 @@ function pintarResumen() {
   $("#n-alertas").textContent = participantes.filter(hayAdvertencia).length;
 }
 
-// ------------------------------------------------------------------ registro abierto/cerrado
-$("#alternar").addEventListener("click", async () => {
-  const objetivo = registroAbierto !== true;
-  if (!objetivo && !confirm("¿Cerrar el registro? Nadie más podrá inscribirse.")) return;
-  $("#alternar").disabled = true;
-  try { await fijarRegistroAbierto(objetivo); registroAbierto = objetivo; aviso(msg, ""); }
-  catch { aviso(msg, "No se pudo cambiar el estado del registro.", "error"); }
-  $("#alternar").disabled = false; pintarEstado();
-});
-
-// ------------------------------------------------------------------ pestañas
+// ------------------------------------------------------------------ pestañas (teclado: ← → Inicio Fin)
 const tabs = ["participantes", "lista", "alta"];
-for (const t of tabs) $(`#tab-b-${t}`).addEventListener("click", () => {
+function activarTab(t, enfocar = false) {
   for (const u of tabs) {
-    $(`#tab-b-${u}`).setAttribute("aria-selected", String(u === t));
+    const b = $(`#tab-b-${u}`);
+    b.setAttribute("aria-selected", String(u === t));
+    b.tabIndex = u === t ? 0 : -1;
     $(`#tab-${u}`).hidden = u !== t;
+    if (u === t && enfocar) b.focus();
   }
+}
+tabs.forEach((t, i) => {
+  $(`#tab-b-${t}`).addEventListener("click", () => activarTab(t));
+  $(`#tab-b-${t}`).addEventListener("keydown", (e) => {
+    const destino = { ArrowRight: (i + 1) % tabs.length, ArrowLeft: (i + tabs.length - 1) % tabs.length, Home: 0, End: tabs.length - 1 }[e.key];
+    if (destino === undefined) return;
+    e.preventDefault(); activarTab(tabs[destino], true);
+  });
 });
 
-// ------------------------------------------------------------------ participantes
+// ------------------------------------------------------------------ participantes (tabla + búsqueda)
 $("#solo-alertas").addEventListener("change", pintarParticipantes);
+$("#buscar").addEventListener("input", pintarParticipantes);
 
 function pintarParticipantes() {
-  const cont = $("#participantes");
-  const solo = $("#solo-alertas").checked;
-  const filas = participantes.filter((p) => !solo || hayAdvertencia(p));
-  cont.replaceChildren(...(filas.length ? filas.map(filaParticipante)
-    : [h("p", { class: "suave" }, solo ? "Ningún participante tiene advertencias." : "Todavía no hay participantes inscritos.")]));
+  const q = plano($("#buscar").value.trim()), solo = $("#solo-alertas").checked;
+  const filas = participantes.filter((p) =>
+    (!solo || hayAdvertencia(p)) && (!q || plano(`${nombreMostrado(p)} ${p.nombre} ${p.correo}`).includes(q)));
+  $("#contador-tabla").textContent = participantes.length
+    ? `Mostrando ${filas.length} de ${participantes.length} participantes.` : "";
+  $("#participantes").replaceChildren(...(filas.length ? filas.map(filaParticipante)
+    : [h("tr", {}, h("td", { class: "vacio", colspan: "5" },
+        participantes.length ? "Ningún participante coincide con la búsqueda." : "Todavía no hay participantes inscritos."))]));
 }
 
 function filaParticipante(p) {
   const estado = estadoNombre(p);
-  const nodos = [
-    h("div", { class: "nombre" }, nombreMostrado(p),
-      p.origen === "admin" ? h("span", { class: "insignia" }, "alta manual") : null,
-      estado === "sin-oficial" ? h("span", { class: "insignia alerta" }, "fuera de la lista") : null,
-      estado === "difiere" ? h("span", { class: "insignia alerta" }, "escrito distinto") : null,
-      estado === "no-corresponde" ? h("span", { class: "insignia fuerte" }, "no corresponde") : null),
-    h("div", { class: "meta" }, `${p.correo} · ${fechaCorta(p.creadoEn)}`),
-    h("div", { class: "accion" }, h("button", { type: "button", class: "peligro", onclick: () => eliminar(p) }, "Eliminar")),
-  ];
-  if (estado === "difiere") nodos.splice(2, 0, h("div", { class: "advertencia" }, `⚠ Tecleó: «${p.nombre}» (difiere del nombre oficial).`));
-  if (estado === "no-corresponde") nodos.splice(2, 0, h("div", { class: "advertencia fuerte" }, `⚠ Tecleó: «${p.nombre}», que NO corresponde a este registro. Revisa y elimina si es una suplantación.`));
-  if (estado === "sin-oficial") nodos.splice(2, 0, h("div", { class: "advertencia" }, "⚠ Esta clave no está en la lista de la clase; se muestra el nombre tecleado."));
-  return h("div", { class: "fila" }, nodos);
+  const nombre = h("td", { class: "nombre" }, nombreMostrado(p),
+    p.origen === "admin" ? h("span", { class: "insignia" }, "alta manual") : null,
+    estado === "sin-oficial" ? h("span", { class: "insignia alerta" }, "fuera de la lista") : null,
+    estado === "difiere" ? h("span", { class: "insignia alerta" }, "escrito distinto") : null,
+    estado === "no-corresponde" ? h("span", { class: "insignia fuerte" }, "no corresponde") : null,
+    estado === "difiere" ? h("div", { class: "advertencia" }, `⚠ Tecleó: «${p.nombre}» (difiere del nombre oficial).`) : null,
+    estado === "no-corresponde"
+      ? h("div", { class: "advertencia fuerte" }, `⚠ Tecleó: «${p.nombre}», que NO corresponde a este registro. Revisa y elimina si es una suplantación.`) : null,
+    estado === "sin-oficial" ? h("div", { class: "advertencia" }, "⚠ Esta clave no está en la lista de la clase; se muestra el nombre tecleado.") : null);
+  return h("tr", {}, nombre,
+    h("td", { "data-label": "Correo" }, p.correo),
+    h("td", { "data-label": "Origen" }, p.origen === "admin" ? "Alta manual" : "Registro"),
+    h("td", { "data-label": "Fecha" }, fechaCorta(p.creadoEn)),
+    h("td", { class: "acciones" }, h("button", {
+      type: "button", class: "peligro", "aria-label": `Eliminar a ${nombreMostrado(p)}`, onclick: () => eliminar(p),
+    }, "Eliminar")));
 }
 
 async function eliminar(p) {
@@ -146,11 +163,12 @@ async function confirmarLista() {
 
 function pintarLista() {
   const inscritos = new Set(participantes.map((p) => p.id));
-  const cont = $("#lista-actual");
-  cont.replaceChildren(...(lista.length ? lista.map((l) => h("div", { class: "fila" },
+  $("#lista-actual").replaceChildren(...(lista.length ? lista.map((l) => h("div", { class: "fila" },
     h("div", { class: "nombre" }, l.nombre,
       inscritos.has(l.id) ? h("span", { class: "insignia ok" }, "inscrito") : h("span", { class: "insignia" }, "pendiente")),
-    h("div", { class: "accion" }, h("button", { type: "button", class: "peligro", onclick: () => quitarDeLista(l) }, "Quitar"))))
+    h("div", { class: "accion" }, h("button", {
+      type: "button", class: "peligro", "aria-label": `Quitar a ${l.nombre} de la lista`, onclick: () => quitarDeLista(l),
+    }, "Quitar"))))
     : [h("p", { class: "suave" }, "La lista está vacía. Cárgala antes de abrir el registro.")]));
 }
 
@@ -160,24 +178,56 @@ async function quitarDeLista(l) {
   await recargar();
 }
 
-// ------------------------------------------------------------------ alta manual
+// ------------------------------------------------------------------ alta manual (mismas validaciones que el registro)
+const altaNombre = $("#alta-nombre"), altaCorreo = $("#alta-correo");
+const vAltaNombre = validarEnVivo(altaNombre, mensajeErrorNombre);
+const vAltaCorreo = validarEnVivo(altaCorreo, mensajeErrorCorreo);
+
 $("#form-alta").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const nombre = $("#alta-nombre"), correo = $("#alta-correo"), btn = $("#alta-enviar");
   aviso(msg, "");
-  const clave = claveDeNombre(nombre.value);
-  if (clave && participantes.some((p) => p.id === clave)) { aviso(msg, "Esa persona ya está inscrita (misma clave de nombre).", "error"); return; }
-  if (participantes.some((p) => p.correo === correo.value.trim().toLowerCase())) { aviso(msg, "Ese correo ya está en uso.", "error"); return; }
-  btn.disabled = true;
+  const errNombre = vAltaNombre.validar(), errCorreo = vAltaCorreo.validar();
+  if (errNombre || errCorreo) { (errNombre ? altaNombre : altaCorreo).focus(); return; }
+  const clave = claveDeNombre(altaNombre.value);
+  if (participantes.some((p) => p.id === clave)) { aviso(msg, "Esa persona ya está inscrita (misma clave de nombre).", "error"); return; }
+  if (participantes.some((p) => p.correo === normalizarCorreo(altaCorreo.value))) { aviso(msg, "Ese correo ya está en uso.", "error"); return; }
+  const btn = $("#alta-enviar"); btn.disabled = true;
   try {
-    const r = await crearParticipante({ nombre: nombre.value, correo: correo.value, origen: "admin" });
+    const r = await crearParticipante({ nombre: altaNombre.value, correo: altaCorreo.value, origen: "admin" });
     aviso(msg, `Agregado: ${r.nombre}${oficial(r.clave) ? "" : " (no está en la lista de la clase)"}.`, "exito");
-    nombre.value = ""; correo.value = "";
+    altaNombre.value = ""; altaCorreo.value = ""; vAltaNombre.reiniciar(); vAltaCorreo.reiniciar();
     await recargar();
   } catch (err) {
     aviso(msg, err instanceof ErrorValidacion ? err.message : "No se pudo agregar al participante.", "error");
   }
   btn.disabled = false;
+});
+
+// ------------------------------------------------------------------ vaciar datos (doble confirmación)
+const dlg = $("#dlg-vaciar"), texto = $("#confirmar-texto"), confirmar = $("#confirmar-vaciar");
+$("#abrir-vaciar").addEventListener("click", async () => {
+  const sorteos = await leerColeccion("sorteos").catch(() => []);
+  $("#dlg-detalle").textContent = `Se cerrará el registro y se borrarán ${lista.length} nombres de la lista, ` +
+    `${participantes.length} participantes (con sus correos) y ${sorteos.length} sorteos guardados.`;
+  texto.value = ""; confirmar.disabled = true;
+  dlg.showModal(); texto.focus();
+});
+texto.addEventListener("input", () => { confirmar.disabled = texto.value.trim() !== "BORRAR"; });
+$("#cancelar-vaciar").addEventListener("click", () => dlg.close());
+$("#form-vaciar").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (texto.value.trim() !== "BORRAR") return; // segunda barrera: el botón deshabilitado no basta
+  confirmar.disabled = true; confirmar.textContent = "Borrando…";
+  try {
+    const n = await vaciarDatos();
+    dlg.close();
+    aviso(msg, `Datos eliminados: ${n.lista} de la lista, ${n.participantes} participantes, ${n.correos} correos y ${n.sorteos} sorteos. El registro quedó cerrado.`, "exito");
+  } catch {
+    dlg.close();
+    aviso(msg, "El vaciado no terminó. Revisa tu conexión y vuelve a intentarlo; el registro quedó cerrado.", "error");
+  }
+  confirmar.textContent = "Vaciar datos";
+  await recargar();
 });
 
 // ---------------------------------------------------------------- arranque (al final: usa todo lo anterior)

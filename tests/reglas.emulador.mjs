@@ -112,6 +112,10 @@ await prueba("admin: crea sorteo válido; rechaza ganador inexistente; no edita"
   await assertFails(setDoc(doc(admin(), "sorteos/s2"), { fecha: serverTimestamp(), totalParticipantes: 1, ganadorClave: "nadie-nadie", ronda: 1 }));
   await assertFails(setDoc(doc(admin(), "sorteos/s1"), { fecha: serverTimestamp(), totalParticipantes: 2, ganadorClave: "lopez-maria", ronda: 1 }));
 });
+await prueba("sorteos: admin puede borrar (vaciado); público no", async () => {
+  await assertFails(deleteDoc(doc(publico(), "sorteos/s1")));
+  await assertSucceeds(deleteDoc(doc(admin(), "sorteos/s1")));
+});
 await prueba("colección desconocida denegada incluso a admin", () => assertFails(setDoc(doc(admin(), "otra/x"), { a: 1 })));
 
 console.log(`\n${total - fallos}/${total} pruebas de reglas pasaron`);

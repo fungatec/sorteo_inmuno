@@ -158,9 +158,10 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------------------- sorteos
-    // Solo admin; inmutables una vez creados (sin update ni delete).
+    // Solo admin; no se editan una vez creados (sin update). El delete existe únicamente
+    // para el "Vaciar datos" de fin de evento: la clave del ganador deriva de su nombre.
     match /sorteos/{id} {
-      allow read: if esAdmin();
+      allow read, delete: if esAdmin();
       allow create: if esAdmin()
         && request.resource.data.keys().hasOnly(['fecha', 'totalParticipantes', 'ganadorClave', 'ronda'])
         && request.resource.data.keys().hasAll(['fecha', 'totalParticipantes', 'ganadorClave', 'ronda'])

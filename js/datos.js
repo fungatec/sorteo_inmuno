@@ -69,3 +69,26 @@ export async function guardarSorteo({ totalParticipantes, ganadorClave, ronda })
   await setDoc(ref, { fecha: serverTimestamp(), totalParticipantes, ganadorClave, ronda });
   return ref.id;
 }
+
+/** Borra TODOS los documentos de una colección en lotes de 400. Devuelve cuántos borró. */
+async function borrarColeccion(nombre) {
+  const docs = (await getDocs(collection(db, nombre))).docs;
+  for (let i = 0; i < docs.length; i += 400) {
+    const lote = writeBatch(db);
+    docs.slice(i, i + 400).forEach((d) => lote.delete(d.ref));
+    await lote.commit();
+  }
+  return docs.length;
+}
+
+/**
+ * Vaciado de fin de evento: cierra el registro y borra participantes, correos, sorteos y lista.
+ * El orden importa: primero se cierra el registro; la lista va al final para que, si algo
+ * falla a medias, nadie pueda volver a inscribirse con datos ya borrados.
+ */
+export async function vaciarDatos() {
+  await fijarRegistroAbierto(false);
+  const borrados = {};
+  for (const col of ["participantes", "correos", "sorteos", "lista"]) borrados[col] = await borrarColeccion(col);
+  return borrados;
+}

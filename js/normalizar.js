@@ -100,3 +100,16 @@ export function analizarLista(texto) {
   }
   return { validos, rechazados, colisiones, repetidos };
 }
+
+/** Mensajes para validación en vivo. Devuelven "" si el valor es válido. */
+export function mensajeErrorNombre(nombre) {
+  if (!limpiarNombre(nombre)) return "Escribe tu nombre completo.";
+  return validarNombre(nombre);
+}
+
+export function mensajeErrorCorreo(correo) {
+  const c = normalizarCorreo(correo);
+  if (!c) return "Escribe tu correo institucional.";
+  if (!c.endsWith(DOMINIO_CORREO)) return "El correo debe ser @alumnos.udg.mx";
+  return esCorreoValido(c) ? "" : "Revisa el correo: antes de la @ solo puede haber letras, números y . _ % + -";
+}

@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
   <header class="barra">
     <strong>Panel de administración</strong>
     <nav aria-label="Administración">
@@ -19,13 +20,15 @@
     </nav>
   </header>
 
-  <main class="ancho" id="contenido" hidden>
+  <main class="ancho" id="contenido" tabindex="-1" hidden>
     <div id="aviso" class="aviso" hidden></div>
 
     <section class="tarjeta" aria-labelledby="t-registro">
       <h2 id="t-registro">Registro de participantes</h2>
-      <p class="estado-registro"><span class="punto" id="punto"></span><span id="estado-texto">Consultando…</span></p>
-      <div><button type="button" id="alternar">…</button></div>
+      <div class="interruptor">
+        <button type="button" role="switch" aria-checked="false" aria-labelledby="etq-alternar" id="alternar" disabled></button>
+        <span id="etq-alternar">Consultando…</span>
+      </div>
       <div class="resumen" aria-label="Resumen">
         <div class="dato"><b id="n-lista">–</b><span>nombres en la lista</span></div>
         <div class="dato"><b id="n-registrados">–</b><span>clones inscritos</span></div>
@@ -36,17 +39,27 @@
 
     <div class="tabs" role="tablist" aria-label="Secciones">
       <button type="button" role="tab" id="tab-b-participantes" aria-controls="tab-participantes" aria-selected="true">Participantes</button>
-      <button type="button" role="tab" id="tab-b-lista" aria-controls="tab-lista" aria-selected="false">Lista de la clase</button>
-      <button type="button" role="tab" id="tab-b-alta" aria-controls="tab-alta" aria-selected="false">Alta manual</button>
+      <button type="button" role="tab" id="tab-b-lista" aria-controls="tab-lista" aria-selected="false" tabindex="-1">Lista de la clase</button>
+      <button type="button" role="tab" id="tab-b-alta" aria-controls="tab-alta" aria-selected="false" tabindex="-1">Alta manual</button>
     </div>
 
     <section class="tarjeta" id="tab-participantes" role="tabpanel" aria-labelledby="tab-b-participantes">
       <h2>Participantes inscritos</h2>
       <p class="suave">Se muestra el nombre oficial de la lista. Si lo que la persona tecleó no corresponde o difiere, aparece una advertencia.</p>
-      <label class="check" style="font-weight:400;display:flex;gap:.5rem;align-items:center;margin-block:.5rem 1rem">
-        <input type="checkbox" id="solo-alertas" style="width:auto"> Mostrar solo los que tienen advertencia
-      </label>
-      <div id="participantes"></div>
+      <label for="buscar">Buscar por nombre o correo</label>
+      <input id="buscar" type="search" autocomplete="off" spellcheck="false">
+      <label class="check"><input type="checkbox" id="solo-alertas"> Mostrar solo los que tienen advertencia</label>
+      <p class="suave" id="contador-tabla" aria-live="polite"></p>
+      <div class="tabla-envoltura">
+        <table class="tabla">
+          <caption class="solo-lectores">Participantes inscritos</caption>
+          <thead><tr>
+            <th scope="col">Nombre</th><th scope="col">Correo</th><th scope="col">Origen</th><th scope="col">Fecha</th>
+            <th scope="col"><span class="solo-lectores">Acciones</span></th>
+          </tr></thead>
+          <tbody id="participantes"></tbody>
+        </table>
+      </div>
     </section>
 
     <section class="tarjeta" id="tab-lista" role="tabpanel" aria-labelledby="tab-b-lista" hidden>
@@ -58,7 +71,7 @@
       <textarea id="texto-lista" spellcheck="false" autocomplete="off"></textarea>
       <div class="fila-botones"><button type="button" id="analizar">Revisar lista</button></div>
       <div id="vista-previa" class="vista-previa" hidden></div>
-      <hr style="border:0;border-top:1px solid var(--linea);margin:1.5rem 0">
+      <hr>
       <h2>Lista actual</h2>
       <div id="lista-actual"></div>
     </section>
@@ -68,13 +81,35 @@
       <p class="suave">Para alumnos que no pudieron registrarse. Funciona aunque el registro esté cerrado y aunque el nombre no esté en la lista.</p>
       <form id="form-alta" class="formulario" novalidate>
         <label for="alta-nombre">Nombre completo</label>
-        <input id="alta-nombre" type="text" autocomplete="off" maxlength="100" required>
+        <input id="alta-nombre" type="text" autocomplete="off" maxlength="100" required aria-describedby="alta-nombre-error">
+        <p class="error-campo" id="alta-nombre-error" hidden></p>
         <label for="alta-correo">Correo institucional</label>
-        <input id="alta-correo" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" required placeholder="nombre.apellido@alumnos.udg.mx">
+        <input id="alta-correo" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="100" required placeholder="nombre.apellido@alumnos.udg.mx" aria-describedby="alta-correo-error">
+        <p class="error-campo" id="alta-correo-error" hidden></p>
         <button type="submit" id="alta-enviar">Agregar participante</button>
       </form>
     </section>
+
+    <section class="tarjeta zona-peligro" aria-labelledby="t-peligro">
+      <h2 id="t-peligro">Al terminar el evento</h2>
+      <p class="suave">Borra todos los datos personales: lista, participantes, correos y sorteos. No se puede deshacer.</p>
+      <button type="button" class="peligro" id="abrir-vaciar">Vaciar datos al terminar el evento</button>
+    </section>
   </main>
+
+  <dialog id="dlg-vaciar" aria-labelledby="dlg-titulo">
+    <form id="form-vaciar" novalidate>
+      <h2 id="dlg-titulo">¿Vaciar todos los datos?</h2>
+      <p id="dlg-detalle"></p>
+      <p><b>Esta acción es permanente.</b> Incluye el registro de ganadores: anota antes quién ganó.</p>
+      <label for="confirmar-texto">Para confirmar, escribe BORRAR</label>
+      <input id="confirmar-texto" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <div class="fila-botones">
+        <button type="button" class="secundario" id="cancelar-vaciar">Cancelar</button>
+        <button type="submit" class="peligro-solido" id="confirmar-vaciar" disabled>Vaciar datos</button>
+      </div>
+    </form>
+  </dialog>
   <script type="module" src="js/panel.js"></script>
 </body>
 </html>

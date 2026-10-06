@@ -20,7 +20,7 @@ form.addEventListener("submit", async (e) => {
   } catch (err) {
     const c = err?.code;
     if (c === "app/usuario-invalido" || ["auth/invalid-credential", "auth/wrong-password", "auth/user-not-found", "auth/invalid-email"].includes(c)) aviso(msg, CREDENCIALES, "error");
-    else if (c === "app/no-admin") aviso(msg, "Esta cuenta no tiene permisos de administración.", "error");
+    else if (c === "app/no-admin") aviso(msg, "Sin permisos de administrador.", "error");
     else if (c === "auth/too-many-requests") aviso(msg, "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.", "error");
     else if (c === "auth/network-request-failed") aviso(msg, "No pudimos conectar. Revisa tu conexión.", "error");
     else aviso(msg, "No se pudo iniciar sesión. Inténtalo de nuevo.", "error");

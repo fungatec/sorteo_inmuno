@@ -30,3 +30,22 @@ export function avisoConfigPendiente(contenedor) {
 
 export const fechaCorta = (ts) =>
   ts?.toDate ? ts.toDate().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
+
+/**
+ * Validación en vivo: el mensaje aparece bajo el campo (#<id>-error) tras la primera salida del
+ * campo y se actualiza en cada tecla. Devuelve { validar() } para forzarla al enviar.
+ */
+export function validarEnVivo(input, validador) {
+  const salida = document.getElementById(`${input.id}-error`);
+  let tocado = false;
+  const pintar = () => {
+    const error = validador(input.value);
+    salida.textContent = tocado ? error : "";
+    salida.hidden = !(tocado && error);
+    input.setAttribute("aria-invalid", String(tocado && !!error));
+    return error;
+  };
+  input.addEventListener("blur", () => { tocado = true; pintar(); });
+  input.addEventListener("input", () => { if (tocado) pintar(); });
+  return { validar: () => { tocado = true; return pintar(); }, reiniciar: () => { tocado = false; pintar(); } };
+}

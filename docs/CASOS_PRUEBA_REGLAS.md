@@ -41,6 +41,10 @@ Cuerpo base de un participante (`creadoEn` = `request.time`):
 | 8 | **get** `/config/estado` — sin autenticar | — | **Permitido** |
 | 9 | **get** `/lista/prueba-uno` — sin autenticar | — | **Denegado** |
 
+| 10 | **delete** `/sorteos/x` — sin autenticar | — | **Denegado** |
+| 11 | **delete** `/sorteos/x` — autenticado como admin (UID `i0y2lNrbtRed5L7dTIUFTLSKeQr1`) | — | **Permitido** (solo se usa en «Vaciar datos») |
+| 12 | **update** `/sorteos/x` — admin | cualquier cambio | **Denegado** |
+
 Casos extra recomendados: campo adicional (`x:1`) → Denegado; `origen:"admin"` sin ser admin → Denegado; `nombre` de 4 caracteres → Denegado; `update` o `delete` de un participante sin ser admin → Denegado.
 
 ## Limpieza
