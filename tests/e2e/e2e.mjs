@@ -349,9 +349,9 @@ async function subtitulos(pg, ms = 60000) {
     assert.ok((await r.locator("#enlace-admin").boundingBox()).height >= 44, "objetivo táctil suficiente");
     await r.close();
   });
-  await prueba("PASO 7 · login, panel y sorteo llevan <meta name=\"robots\" content=\"noindex\">; el registro no", async () => {
-    for (const f of ["login", "panel", "sorteo"]) assert.match(readFileSync(join(REPO, `${f}.html`), "utf8"), /<meta name="robots" content="noindex">/, f);
-    assert.doesNotMatch(readFileSync(join(REPO, "index.html"), "utf8"), /noindex/);
+  await prueba("PASO 8 · registro, transmisión, login, panel y sorteo llevan <meta name=\"robots\" content=\"noindex\">", async () => {
+    for (const f of ["index", "en-vivo", "login", "panel", "sorteo"]) assert.match(readFileSync(join(REPO, `${f}.html`), "utf8"), /<meta name="robots" content="noindex">/, f);
+
   });
   assert.deepEqual(p.errores, []);
 }
@@ -427,6 +427,24 @@ async function subtitulos(pg, ms = 60000) {
     assert.ok(t.toast <= t.barra, JSON.stringify(t));
     await m.close();
   });
+  await prueba("PASO 8 · el panel (con los QR abiertos) solo carga scripts de localhost y del SDK de Firebase en gstatic; nada de cdnjs ni otros terceros", async () => {
+    const m = await p.context().newPage(); const scripts = [], todos = [];
+    m.on("request", (q) => { todos.push(new URL(q.url()).host); if (q.resourceType() === "script") scripts.push(new URL(q.url()).host); });
+    await m.goto(`${BASE}/panel.html?emulador`); await m.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
+    await m.click("#alternar-qr"); await m.waitForSelector("#qr-zona:not([hidden])"); await m.waitForTimeout(500);
+    const permitidos = new Set(["localhost:8000", "www.gstatic.com"]);
+    assert.ok(scripts.length > 3 && scripts.every((h) => permitidos.has(h)), "scripts: " + [...new Set(scripts)].join(", "));
+    assert.ok(!todos.some((h) => /cdnjs|jsdelivr|unpkg|cloudflare/.test(h)), "hosts: " + [...new Set(todos)].join(", "));
+    const dir = join(REPO, "js"); const { readdirSync } = await import("node:fs");
+    for (const f of [...readdirSync(dir), "../index.html", "../panel.html", "../sorteo.html", "../en-vivo.html", "../login.html"]) {
+      if (f === "vendor") continue;
+      const t = readFileSync(join(dir, f), "utf8").split("\n");
+      assert.ok(!t.some((l) => /<script[^>]+src="https?:\/\//.test(l) || /cdnjs\.cloudflare|jsdelivr|unpkg\.com/.test(l)), `${f}: sin CDN de terceros`);
+    }
+    assert.ok(existsSync(join(REPO, "js/vendor/qrcode.js")) && existsSync(join(REPO, "js/vendor/LICENSE-qrcode-generator.txt")));
+    assert.match(readFileSync(join(REPO, "js/vendor/LICENSE-qrcode-generator.txt"), "utf8"), /MIT License/);
+    await m.close();
+  });
   await prueba("PASO 7B · panel: códigos QR generados en el navegador (canvas con módulos oscuros) y mensaje amable si la librería no carga", async () => {
     const m = await p.context().newPage(); await m.goto(`${BASE}/panel.html?emulador`); await m.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
     {
@@ -436,7 +454,7 @@ async function subtitulos(pg, ms = 60000) {
       assert.ok(oscuros.every((n) => n > 2000), oscuros.join(","));
       assert.equal(await m.getAttribute("#alternar-qr", "aria-expanded"), "true");
     }
-    const f = await p.context().newPage(); await f.context().route(/\/js\/vendor\/qrcode\.js/, (r) => r.abort());
+    const f = await p.context().newPage(); await f.context().route("**/js/vendor/qrcode.js", (r) => r.abort());
     await f.goto(`${BASE}/panel.html?emulador`); await f.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
     await f.evaluate(() => { delete globalThis.qrcode; });
     await f.click("#alternar-qr"); await f.waitForFunction(() => !document.querySelector("#qr-aviso").hidden);
