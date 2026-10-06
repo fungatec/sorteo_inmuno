@@ -4,7 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#053043">
-  <title>Registro · Sorteo Inmunobiología</title>
+  <title>Inscribe tu linfocito T · Sorteo de Inmunobiología</title>
+  <meta name="description" content="Regístrate con tu correo @alumnos.udg.mx y participa en el sorteo del libro de Inmunobiología (CUCBA · UdeG).">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="es_MX">
+  <meta property="og:site_name" content="Sorteo de Inmunobiología · CUCBA UdeG">
+  <meta property="og:title" content="Inscribe tu linfocito T · Sorteo de Inmunobiología">
+  <meta property="og:description" content="Regístrate con tu correo @alumnos.udg.mx y participa en el sorteo del libro de Inmunobiología.">
+  <meta property="og:url" content="https://fungatec.github.io/sorteo_inmuno/">
+  <meta property="og:image" content="https://fungatec.github.io/sorteo_inmuno/img/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Un linfocito T sobre fondo petróleo y el texto «Sorteo de Inmunobiología».">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
@@ -28,36 +42,38 @@
       <circle cx="32" cy="32" r="12.5" fill="#43398a"/>
     </svg>
     <h1>Inscribe tu linfocito T</h1>
-    <p class="lead">Cada linfocito T virgen porta un receptor (TCR) único y patrulla los ganglios linfáticos. Inscribe el tuyo para el sorteo del libro de Inmunobiología.</p>
+    <p class="lead">Escribe tu nombre y tu correo institucional para participar en el sorteo del libro.</p>
     </div>
 
     <p class="estado-registro" id="estado" aria-live="polite"><span class="punto" id="punto"></span><span id="estado-texto">Consultando…</span></p>
+    <p id="sin-conexion" class="aviso aviso-aviso" role="status" hidden>Sin conexión a internet. Tus datos siguen aquí: conéctate de nuevo para inscribirte.</p>
     <div id="aviso" class="aviso" hidden></div>
 
-    <section id="cerrado" class="tarjeta" hidden>
+    <section id="cerrado" class="tarjeta tarjeta-cerrado" hidden>
       <h2>El registro está cerrado</h2>
-      <p class="suave">Si crees que es un error, avisa a la maestra.</p>
+      <p>Gracias por tu interés: ya no se aceptan nuevas inscripciones.</p>
+      <p class="suave">Si crees que es un error, avisa a la maestra. Mientras tanto, puedes seguir el sorteo desde tu celular.</p>
       <p><a class="enlace-vivo" href="en-vivo.html">Ver el sorteo en vivo</a></p>
     </section>
 
     <form id="registro" class="formulario" novalidate>
       <label for="nombre">Nombre completo
-        <span class="ayuda" id="nombre-ayuda">Escríbelo como aparece en la lista de la clase; el orden de nombre y apellidos no importa.</span>
+        <span class="ayuda" id="nombre-ayuda">Con ambos apellidos, como aparece en tu lista (el orden no importa).</span>
       </label>
-      <input id="nombre" name="nombre" type="text" autocomplete="name" autocapitalize="words" maxlength="100" required aria-describedby="nombre-ayuda nombre-error">
+      <input id="nombre" name="nombre" type="text" autocomplete="name" autocapitalize="words" autocorrect="off" spellcheck="false" maxlength="100" required placeholder="Ej.: Marta Elena Ríos Vega" aria-describedby="nombre-ayuda nombre-error">
       <p class="error-campo" id="nombre-error" hidden></p>
 
       <label for="correo">Correo institucional
         <span class="ayuda" id="correo-ayuda">Debe terminar en @alumnos.udg.mx</span>
       </label>
-      <input id="correo" name="correo" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" maxlength="100" required placeholder="nombre.apellido@alumnos.udg.mx" aria-describedby="correo-ayuda correo-error">
+      <input id="correo" name="correo" type="email" inputmode="email" autocomplete="email" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="100" required placeholder="Ej.: marta.rios@alumnos.udg.mx" aria-describedby="correo-ayuda correo-error">
       <p class="error-campo" id="correo-error" hidden></p>
 
-      <button type="submit" id="enviar">Inscribir mi linfocito</button>
+      <button type="submit" id="enviar" class="principal">Inscribir mi linfocito</button>
       <p class="privacidad">Tus datos se usan solo para este sorteo y se eliminarán al terminar el evento. La transmisión en vivo muestra, a quien tenga el enlace, la máscara del nombre del ganador (por ejemplo, «Marta E. R.»).</p>
     </form>
 
-    <section id="listo" class="clon-ok" hidden>
+    <section id="listo" class="clon-ok tarjeta" hidden>
       <svg class="repertorio" viewBox="0 0 260 150" role="img" aria-label="Un linfocito T virgen cruza la pared de una vénula de endotelio alto y se suma a los demás linfocitos del ganglio">
         <defs><g id="lin"><circle r="11" fill="#A7F0F3" stroke="#053043" stroke-width="1.6"/><circle r="7.8" fill="#43398a"/></g></defs>
         <rect x="-10" y="-6" width="280" height="46" fill="#7a2f3d" opacity=".6"/>
@@ -74,7 +90,9 @@
       </svg>
       <h1 tabindex="-1">Tu linfocito T ya está en el ganglio</h1>
       <p class="lead" id="listo-texto"></p>
-      <p><a class="enlace-vivo" href="en-vivo.html">Ver el sorteo en vivo</a></p>
+      <p class="acciones-exito"><a class="enlace-vivo grande" href="en-vivo.html" id="ver-en-vivo">Ver el sorteo en vivo</a></p>
+      <p class="suave">Guarda este enlace para el día del sorteo.</p>
+      <p><button type="button" class="secundario" id="copiar-vivo">Copiar enlace</button></p>
     </section>
 
   </main>

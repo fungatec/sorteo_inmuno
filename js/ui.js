@@ -38,8 +38,9 @@ export const fechaCorta = (ts) =>
   ts?.toDate ? ts.toDate().toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 /**
- * Validación en vivo: el mensaje aparece bajo el campo (#<id>-error) tras la primera salida del
- * campo y se actualiza en cada tecla. Devuelve { validar() } para forzarla al enviar.
+ * Validación del campo: el mensaje aparece bajo el campo (#<id>-error) al SALIR del campo y al enviar, no en cada tecla.
+ * Mientras se escribe solo se retira un error ya mostrado en cuanto el valor pasa a ser válido (nunca aparece uno nuevo).
+ * Devuelve { validar() } para forzarla al enviar.
  */
 export function validarEnVivo(input, validador) {
   const salida = document.getElementById(`${input.id}-error`);
@@ -52,7 +53,7 @@ export function validarEnVivo(input, validador) {
     return error;
   };
   input.addEventListener("blur", () => { tocado = true; pintar(); });
-  input.addEventListener("input", () => { if (tocado) pintar(); });
+  input.addEventListener("input", () => { if (tocado && !salida.hidden && !validador(input.value)) pintar(); });
   return { validar: () => { tocado = true; return pintar(); }, reiniciar: () => { tocado = false; pintar(); } };
 }
 
@@ -65,4 +66,13 @@ export async function copiarTexto(texto) {
     document.body.append(t); t.select();
     const ok = document.execCommand("copy"); t.remove(); return ok;
   } catch { return false; }
+}
+
+/** Botón con estado de copiado: cambia su texto un instante («Copiado») y lo restaura. */
+export function marcarCopiado(boton, textoCopiado = "Copiado ✓", ms = 2000) {
+  const original = boton.dataset.original ?? boton.textContent;
+  boton.dataset.original = original;
+  boton.textContent = textoCopiado;
+  clearTimeout(boton._tCopiado);
+  boton._tCopiado = setTimeout(() => { boton.textContent = original; }, ms);
 }

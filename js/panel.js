@@ -9,11 +9,14 @@ import {
   analizarLista, claveDeNombre, compararConOficial, mensajeErrorNombre, mensajeErrorCorreo, normalizarCorreo,
 } from "./normalizar.js";
 import { textoRegistroSorteo, nombreArchivoRegistro, enmascararNombre } from "./sorteo-util.js";
-import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo, copiarTexto } from "./ui.js";
+import { $, h, aviso, avisoConfigPendiente, fechaCorta, validarEnVivo, copiarTexto, marcarCopiado } from "./ui.js";
 import { urlTransmision } from "./en-vivo-util.js";
+import { urlRegistro } from "./enlaces.js";
+import { dibujarQR } from "./qr.js";
 
 const msg = $("#aviso");
 let lista = [], participantes = [], registroAbierto = null, vistaPrevia = null;
+let sorteosN = null, vaciado = false, cargado = false;   // sorteosN: rondas guardadas (null = no se pudo leer)
 
 // ------------------------------------------------------------------ datos derivados
 const oficial = (clave) => lista.find((l) => l.id === clave)?.nombre;
@@ -30,13 +33,15 @@ async function recargar() {
     ]);
     lista.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
     participantes.sort((a, b) => nombreMostrado(a).localeCompare(nombreMostrado(b), "es"));
+    sorteosN = await leerColeccion("sorteos").then((x) => x.length).catch(() => null);
+    cargado = true;
   } catch {
     aviso(msg, "No se pudieron leer los datos. Revisa tu conexión y recarga la página.", "error");
   }
   pintar();
 }
 
-function pintar() { pintarEstado(); pintarResumen(); pintarParticipantes(); pintarLista(); }
+function pintar() { pintarEstado(); pintarResumen(); pintarGuia(); pintarParticipantes(); pintarLista(); }
 
 // ------------------------------------------------------------------ registro abierto/cerrado
 function pintarEstado() {
@@ -45,11 +50,65 @@ function pintarEstado() {
   b.setAttribute("aria-checked", String(registroAbierto === true));
   $("#etq-alternar").textContent = registroAbierto === true ? "Registro abierto"
     : registroAbierto === false ? "Registro cerrado" : "Estado no disponible (¿existe config/estado?)";
+  const cab = $("#estado-cabecera");
+  cab.textContent = registroAbierto === true ? "ABIERTO" : registroAbierto === false ? "CERRADO" : "NO DISPONIBLE";
+  cab.dataset.estado = registroAbierto === true ? "abierto" : registroAbierto === false ? "cerrado" : "desconocido";
 }
 
-$("#copiar-enlace").addEventListener("click", async () => {
-  const url = urlTransmision(location.href);
-  if (await copiarTexto(url)) aviso(msg, `Enlace de la transmisión copiado: ${url}`, "exito");
+// ------------------------------------------------------------------ enlaces (copiar con confirmación «Copiado») y códigos QR
+async function copiarEnlace(boton, url, que) {
+  if (await copiarTexto(url)) { marcarCopiado(boton); aviso(msg, `Enlace ${que} copiado: ${url}`, "exito"); }
+  else aviso(msg, `No se pudo copiar automáticamente. El enlace ${que} es: ${url}`, "aviso");
+}
+$("#copiar-registro").addEventListener("click", (e) => copiarEnlace(e.currentTarget, urlRegistro(location.href), "de registro"));
+$("#alternar-qr").addEventListener("click", async (e) => {
+  const boton = e.currentTarget, zona = $("#qr-zona"), abrir = zona.hidden;
+  e.currentTarget.setAttribute("aria-expanded", String(abrir));
+  e.currentTarget.textContent = abrir ? "Ocultar códigos QR" : "Mostrar códigos QR";
+  zona.hidden = !abrir; $("#qr-aviso").hidden = true;
+  if (!abrir) return;
+  try {
+    await dibujarQR($("#qr-registro"), urlRegistro(location.href));
+    await dibujarQR($("#qr-vivo"), urlTransmision(location.href));
+  } catch {
+    zona.hidden = true; boton.setAttribute("aria-expanded", "false"); boton.textContent = "Mostrar códigos QR";
+    $("#qr-aviso").textContent = "No se pudo cargar el generador de códigos QR (requiere conexión a cdnjs). Los enlaces se pueden copiar con los botones.";
+    $("#qr-aviso").hidden = false;
+  }
+});
+msg.addEventListener("click", () => aviso(msg, ""));       // los avisos (toasts) se cierran al tocarlos
+
+// ------------------------------------------------------------------ guía del evento y «Ir al sorteo»
+function pintarGuia() {
+  if (!cargado) return;
+  const hayLista = lista.length > 0, hayPart = participantes.length > 0, abierto = registroAbierto === true, hechoSorteo = (sorteosN ?? 0) > 0;
+  if (hayLista || hayPart || hechoSorteo) vaciado = false;     // «Datos eliminados» solo vale mientras todo siga vacío
+  const pasos = {
+    lista: { e: hayLista ? "hecho" : "actual", d: hayLista ? `${lista.length} nombres cargados.` : "En «Lista de la clase»: un nombre por línea." },
+    abrir: { e: abierto || hayPart ? "hecho" : hayLista ? "actual" : "pendiente",
+      d: abierto ? `Abierto · ${participantes.length} inscritos.` : hayPart ? `Cerrado · ${participantes.length} inscritos.` : "Con el interruptor de arriba, cuando la lista esté cargada." },
+    sortear: { e: hechoSorteo ? "hecho" : !abierto && hayPart ? "actual" : "pendiente",
+      d: hechoSorteo ? `${sorteosN} ronda(s) guardada(s).` : abierto ? "Cierra el registro cuando termine el plazo; ensaya antes con «Ensayo»." : "Abre «Ir al sorteo» (ensaya antes con la casilla «Ensayo»)." },
+    vaciar: { e: vaciado ? "hecho" : hechoSorteo ? "actual" : "pendiente", d: vaciado ? "Datos eliminados." : "Primero «Descargar registro del sorteo»; luego «Vaciar datos» (zona de peligro, al final)." },
+  };
+  const texto = { hecho: "Hecho", actual: "Siguiente", pendiente: "Pendiente" };
+  for (const [id, { e, d }] of Object.entries(pasos)) {
+    const li = $(`#guia [data-paso="${id}"]`);
+    li.dataset.estado = e; li.querySelector(".detalle").textContent = d;
+    li.querySelector(".paso-estado").textContent = texto[e];
+    li.querySelector(".paso-num").textContent = e === "hecho" ? "✓" : String(Object.keys(pasos).indexOf(id) + 1);
+  }
+  const sin = !hayPart;
+  $("#ir-sorteo").disabled = sin;
+  $("#ir-sorteo").title = sin ? "Disponible cuando haya al menos un participante inscrito." : "";
+  $("#ir-sorteo-ayuda").textContent = sin ? "«Ir al sorteo» se habilita cuando haya al menos un participante inscrito."
+    : abierto ? "El registro sigue abierto: ciérralo antes del sorteo real y ensaya antes con la casilla «Ensayo»." : "Listo: abre «Ir al sorteo» y ensaya antes con la casilla «Ensayo».";
+}
+$("#ir-sorteo").addEventListener("click", () => { location.href = "sorteo.html"; });
+
+$("#copiar-enlace").addEventListener("click", async (e) => {
+  const boton = e.currentTarget, url = urlTransmision(location.href);       // currentTarget se anula tras el primer await
+  if (await copiarTexto(url)) { marcarCopiado(boton); aviso(msg, `Enlace de la transmisión copiado: ${url}`, "exito"); }
   else aviso(msg, `No se pudo copiar automáticamente. El enlace de la transmisión es: ${url}`, "aviso");
 });
 $("#alternar").addEventListener("click", async () => {
@@ -58,7 +117,7 @@ $("#alternar").addEventListener("click", async () => {
   $("#alternar").disabled = true;
   try { await fijarRegistroAbierto(objetivo); registroAbierto = objetivo; aviso(msg, ""); }
   catch { aviso(msg, "No se pudo cambiar el estado del registro.", "error"); }
-  pintarEstado();
+  pintarEstado(); pintarGuia();
 });
 
 function pintarResumen() {
@@ -66,6 +125,10 @@ function pintarResumen() {
   $("#n-lista").textContent = lista.length;
   $("#n-registrados").textContent = participantes.length;
   $("#n-pendientes").textContent = lista.length - inscritosDeLista;
+  $("#prog-x").textContent = inscritosDeLista; $("#prog-y").textContent = lista.length;
+  const pct = lista.length ? Math.round((inscritosDeLista / lista.length) * 100) : 0;
+  $("#progreso").setAttribute("aria-valuenow", String(pct)); $("#progreso").setAttribute("aria-valuetext", `${inscritosDeLista} de ${lista.length} (${pct} %)`);
+  $("#progreso").style.setProperty("--p", `${pct}%`);
   $("#n-alertas").textContent = participantes.filter(hayAdvertencia).length;
 }
 
@@ -101,7 +164,8 @@ function pintarParticipantes() {
     ? `Mostrando ${filas.length} de ${participantes.length} participantes.` : "";
   $("#participantes").replaceChildren(...(filas.length ? filas.map(filaParticipante)
     : [h("tr", {}, h("td", { class: "vacio", colspan: "5" },
-        participantes.length ? "Ningún participante coincide con la búsqueda." : "Todavía no hay participantes inscritos."))]));
+        participantes.length ? "Ningún participante coincide con la búsqueda."
+          : "Todavía no hay participantes inscritos. Comparte el enlace de registro (botón «Copiar enlace de registro»)."))]));
 }
 
 function filaParticipante(p) {
@@ -253,6 +317,7 @@ $("#form-vaciar").addEventListener("submit", async (e) => {
   confirmar.disabled = true; confirmar.textContent = "Borrando…";
   try {
     const n = await vaciarDatos();
+    vaciado = true;
     dlg.close();
     const resumen = `Datos eliminados: ${n.lista} de la lista, ${n.participantes} participantes, ${n.correos} correos y ${n.sorteos} sorteos. El registro quedó cerrado.`;
     if (n.transmisionLimpia) aviso(msg, `${resumen} La transmisión en vivo quedó en espera.`, "exito");

@@ -1,6 +1,10 @@
 /* Identidad FungaTec. Ver CLAUDE.md → Identidad visual.
    Texto petróleo sobre cielo/verde (blanco sobre cielo NO cumple contraste). */
 :root {
+  /* Escala de espaciado (múltiplos de 8 px) y tipográfica (Paso 7B) */
+  --s-1: .5rem; --s-2: 1rem; --s-3: 1.5rem; --s-4: 2rem; --s-5: 3rem;
+  --t-sm: .875rem; --t-base: 1rem; --t-lg: 1.25rem; --t-xl: 1.5rem; --t-2xl: 2rem;
+  --dur: .18s;                               /* transiciones sobrias (≤ 200 ms); se anulan con prefers-reduced-motion */
   --petroleo: #053043;   /* fondo/base, texto principal */
   --cielo: #25A9E0;      /* acción principal */
   --celeste: #A7F0F3;    /* superficies y acentos suaves */
@@ -289,3 +293,89 @@ button.ico { min-width: 40px; padding: .4rem; border-radius: 99px; font-family: 
 /* ---- Paso 7: cabecera discreta del registro (enlace «Administración») ---- */
 .cabecera-registro { display: flex; justify-content: flex-end; width: min(100% - 2 * var(--espacio), 34rem); margin: 0 auto; padding-top: .25rem; }
 a.enlace-admin { display: inline-flex; align-items: center; min-height: 48px; padding: 0 .25rem; font-size: .85rem; color: var(--suave); }
+
+/* =====================================================================================================
+   Paso 7 · Bloque B — pulido UI/UX (mobile-first, 360 px). Tokens: ver :root (espaciado de 8 px, escala tipográfica).
+   ===================================================================================================== */
+input, textarea { min-height: 48px; font-size: max(1rem, 16px); transition: border-color var(--dur), box-shadow var(--dur); }
+input::placeholder, textarea::placeholder { color: var(--suave); opacity: .85; }
+input:focus-visible, textarea:focus-visible { border-color: var(--cielo); }
+button, a.enlace-vivo { transition: filter var(--dur), background-color var(--dur), transform var(--dur); }
+button:active:not([disabled]) { transform: translateY(1px); }
+button[aria-busy="true"] { cursor: progress; }
+
+/* Registro */
+.cabecera-registro { width: min(100% - 2 * var(--espacio), 34rem); }
+#intro { margin-bottom: var(--s-2); }
+#intro h1 { font-size: clamp(var(--t-xl), 7vw, var(--t-2xl)); }
+#intro .lead { margin-bottom: var(--s-2); }
+.formulario button.principal { width: 100%; min-height: 56px; margin-top: var(--s-3); font-size: var(--t-lg); }
+.formulario .ayuda { margin-top: .25rem; }
+.tarjeta-cerrado { text-align: center; padding-block: var(--s-4); }
+.tarjeta-cerrado h2 { font-size: var(--t-xl); }
+.clon-ok.tarjeta { padding-block: var(--s-4); animation: entra var(--dur) ease-out both; }
+.acciones-exito { margin-block: var(--s-3) var(--s-1); }
+a.enlace-vivo.grande { width: 100%; min-height: 56px; font-size: var(--t-lg); }
+@keyframes entra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+#registro:not([hidden]), #cerrado:not([hidden]) { animation: entra var(--dur) ease-out both; }
+
+/* Avisos tipo «toast» (panel): fijos abajo; los de éxito se desvanecen solos, los de error/aviso se cierran al tocarlos */
+.aviso[data-toast] { position: fixed; z-index: 30; left: 50%; bottom: var(--s-2); transform: translateX(-50%); width: min(100% - 2rem, 36rem);
+  margin: 0; box-shadow: 0 8px 24px rgba(5, 48, 67, .25); cursor: pointer; animation: entra var(--dur) ease-out both; }
+.aviso[data-toast].aviso-exito { animation: entra var(--dur) ease-out both, sale .3s ease-in 6s forwards; }
+@keyframes sale { to { opacity: 0; visibility: hidden; } }
+
+/* Panel: estado, progreso y guía */
+.estado-fila { display: grid; gap: var(--s-3); }
+.estado-panel h2 { margin-bottom: var(--s-1); }
+.insignia-estado { display: inline-block; padding: .1rem .75rem; border-radius: 99px; font-size: var(--t-base); font-weight: 700; letter-spacing: .04em; vertical-align: middle; background: var(--celeste); }
+.insignia-estado[data-estado="abierto"] { background: var(--verde); }
+.insignia-estado[data-estado="cerrado"] { background: var(--error-fondo); color: var(--error); border: 1px solid var(--error); }
+.interruptor { display: flex; align-items: center; gap: var(--s-2); min-height: 48px; }
+.progreso-texto { margin: 0 0 var(--s-1); font-size: var(--t-lg); }
+.progreso { height: 12px; border-radius: 99px; background: var(--linea); overflow: hidden; }
+.progreso > i { display: block; height: 100%; width: var(--p, 0%); background: var(--verde); border-radius: 99px; transition: width .2s ease-out; }
+.guia { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-1); }
+.guia li { display: grid; grid-template-columns: 2rem 1fr auto; gap: var(--s-2); align-items: start; padding: var(--s-1) 0; border-top: 1px solid var(--linea); }
+.guia li:first-child { border-top: 0; }
+.paso-num { width: 2rem; height: 2rem; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--linea); color: var(--petroleo); }
+.guia li[data-estado="hecho"] .paso-num { background: var(--verde); }
+.guia li[data-estado="actual"] .paso-num { background: var(--cielo); box-shadow: 0 0 0 3px var(--celeste); }
+.guia .titulo-paso { display: block; font-weight: 600; }
+.guia .detalle { display: block; font-size: var(--t-sm); color: var(--suave); }
+.paso-estado { font-size: var(--t-sm); font-weight: 700; padding: .1rem .6rem; border-radius: 99px; background: var(--superficie); border: 1px solid var(--linea); white-space: nowrap; }
+.guia li[data-estado="hecho"] .paso-estado { background: var(--verde); border-color: var(--verde); }
+.guia li[data-estado="actual"] .paso-estado { background: var(--celeste); border-color: var(--cielo); }
+.barra-acciones { display: flex; gap: var(--s-1); flex-wrap: wrap; margin-bottom: 1.25rem; }
+.barra-acciones button { flex: 1 1 12rem; min-height: 48px; }
+.ayuda-sorteo { margin: var(--s-1) 0 0; }
+.qr-rejilla { display: flex; flex-wrap: wrap; gap: var(--s-3); margin-top: var(--s-2); }
+.qr-rejilla figure { margin: 0; text-align: center; }
+.qr-rejilla canvas { display: block; background: #fff; padding: 12px; border: 1px solid var(--linea); border-radius: var(--radio); width: 200px; height: 200px; }
+.qr-rejilla figcaption { margin-top: .25rem; font-size: var(--t-sm); font-weight: 600; }
+
+/* Esqueletos de carga */
+.esqueleto i { display: block; height: 1rem; border-radius: 6px; background: linear-gradient(90deg, var(--linea), #eaf8f9, var(--linea)); background-size: 200% 100%; animation: brillo 1.2s linear infinite; }
+@keyframes brillo { to { background-position: -200% 0; } }
+.dato b.cargando { color: transparent; background: var(--linea); border-radius: 6px; width: 3rem; animation: brillo 1.2s linear infinite; }
+.estado-vacio { text-align: center; padding: var(--s-4) var(--s-2); color: var(--suave); }
+
+/* Zona de peligro separada */
+.zona-peligro { margin-top: var(--s-5); border: 2px solid var(--error); background: #fffafa; }
+.zona-peligro h2 { color: var(--error); }
+
+@media (min-width: 640px) {
+  .estado-fila { grid-template-columns: 1fr 1fr; align-items: center; }
+}
+/* Móvil: la barra de acciones queda fija abajo y el contenido deja espacio para no taparse */
+@media (max-width: 639px) {
+  .barra-acciones { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; margin: 0; padding: var(--s-1) var(--s-2) calc(var(--s-1) + env(safe-area-inset-bottom, 0px));
+    background: var(--blanco); border-top: 1px solid var(--linea); box-shadow: 0 -4px 16px rgba(5, 48, 67, .12); }
+  .barra-acciones button { flex: 1 1 0; padding-inline: .5rem; font-size: var(--t-sm); }
+  main.con-barra { padding-bottom: 6rem; }
+  .aviso[data-toast] { bottom: 5.5rem; }
+  .guia li { grid-template-columns: 2rem 1fr; }
+  .guia .paso-estado { grid-column: 2; justify-self: start; }
+}
+.tabla td[data-label="Origen"], .tabla td.acciones button { white-space: nowrap; }
+@media (max-width: 639px) { .tabla td[data-label="Origen"] { white-space: normal; } }

@@ -2,7 +2,8 @@
 import { configPendiente } from "./firebase.js";
 import { leerRegistroAbierto, crearParticipante, ErrorValidacion } from "./datos.js";
 import { mensajeErrorNombre, mensajeErrorCorreo, limpiarNombre } from "./normalizar.js";
-import { $, aviso, avisoConfigPendiente, validarEnVivo } from "./ui.js";
+import { $, aviso, avisoConfigPendiente, validarEnVivo, copiarTexto, marcarCopiado } from "./ui.js";
+import { urlTransmision } from "./en-vivo-util.js";
 import { sesionAdminActiva } from "./auth.js";
 
 // Mensaje único (decisión de privacidad): Firestore no distingue las causas y no abrimos lecturas.
@@ -68,6 +69,18 @@ form.addEventListener("submit", async (e) => {
 });
 
 iniciar();
+
+// Sin conexión: aviso amable y persistente (el envío igualmente comprueba la red y explica el fallo).
+const bannerRed = $("#sin-conexion");
+const actualizarRed = () => { bannerRed.hidden = navigator.onLine !== false; };
+window.addEventListener("online", actualizarRed); window.addEventListener("offline", actualizarRed); actualizarRed();
+
+// Confirmación: copiar el enlace de la transmisión para guardarlo el día del sorteo.
+$("#copiar-vivo").addEventListener("click", async () => {
+  const url = urlTransmision(location.href);
+  if (await copiarTexto(url)) marcarCopiado($("#copiar-vivo"));
+  else aviso(msg, `No se pudo copiar. El enlace es: ${url}`, "aviso");
+});
 
 // Esta página NUNCA redirige según la sesión: siempre es el registro. Solo el enlace discreto «Administración» cambia de
 // destino (panel.html si ya hay sesión de admin, login.html si no). Ocultar el enlace no es seguridad: la protección son las reglas.

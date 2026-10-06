@@ -15,6 +15,8 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 
 **Entrada de estudiantes y acceso de administración:** la URL raíz (`/sorteo_inmuno/`) abre **siempre** el registro (o «El registro está cerrado»), aunque haya una sesión de admin iniciada: `index.html` nunca redirige según la sesión. El acceso de administración es el enlace discreto «Administración» de la cabecera (va a `login.html`, o a `panel.html` si ya hay sesión de admin). `login.html`, `panel.html` y `sorteo.html` llevan `<meta name="robots" content="noindex">` para que los buscadores no los listen. **Ocultar el enlace no es seguridad:** las URL de administración son públicas (el repositorio lo es); la protección real son las reglas de Firestore y la contraseña de la cuenta admin.
 
+**Enlaces y vista previa:** el panel copia los enlaces de registro y de transmisión y puede mostrar sus códigos QR (se generan en el navegador, sin enviar datos a terceros; solo se descarga la librería `qrcode-generator` 1.4.4 de cdnjs al pulsar «Mostrar códigos QR»). Los enlaces se ven con imagen y título en WhatsApp gracias a las etiquetas Open Graph (`img/og.png`, 1200×630). Para regenerar las imágenes: `npm i --no-save playwright-core && CHROMIUM_PATH=/ruta/a/chrome node tools/generar-og.mjs` (herramienta manual; no forma parte del sitio). WhatsApp guarda en caché la vista previa: si cambias la imagen, usa el depurador de Facebook para forzar la actualización.
+
 ## Pasos manuales pendientes
 
 > Lista completa para publicar, probar en el celular y operar el evento: [`docs/CHECKLIST_PUBLICACION.md`](docs/CHECKLIST_PUBLICACION.md).

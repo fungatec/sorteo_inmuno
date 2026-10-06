@@ -3,6 +3,7 @@
 //   cd tests/e2e && npm i --no-save firebase firebase-tools playwright-core esbuild
 //   npx esbuild fb-entry.js --bundle --format=esm --outfile=fb.js
 //   cp ../../firestore.rules . && echo '{"firestore":{"rules":"firestore.rules"}}' > firebase.json
+//   (opcional, prueba de los códigos QR sin salir a internet: npm pack qrcode-generator@1.4.4, descomprimir y QR_LIB=/ruta/package/qrcode.js)
 //   CHROMIUM_PATH=/ruta/a/chrome npx firebase emulators:exec --only firestore,auth --project sorteoinmuno "node e2e.mjs"
 import { chromium } from "playwright-core";
 import http from "node:http";
@@ -68,6 +69,7 @@ async function nuevaPagina(ctxOpts = {}) {
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.abort());
   await ctx.route(/www\.gstatic\.com\/firebasejs\/10\.14\.1\/.*/, (r) => r.fulfill({
     status: 200, contentType: "text/javascript", headers: { "Access-Control-Allow-Origin": "*" }, body: `export * from "${BASE}/__fb.js";` }));
+  if (process.env.QR_LIB) await ctx.route(/cdnjs\.cloudflare\.com\/ajax\/libs\/qrcode-generator\/1\.4\.4\/qrcode\.min\.js/, (r) => r.fulfill({ status: 200, contentType: "text/javascript", body: readFileSync(process.env.QR_LIB, "utf8") }));
   await ctx.route("**/js/firebase-config.js", (r) => r.fulfill({ status: 200, contentType: "text/javascript", body: CONFIG_TEST }));
   const page = await ctx.newPage();
   page.errores = []; page.on("pageerror", (e) => page.errores.push(e.message));
@@ -161,6 +163,84 @@ async function subtitulos(pg, ms = 60000) {
   await prueba("registro: partículas — 'María Ángeles' coincide con 'María de los Ángeles'", async () => {
     await p2.fill("#nombre", "Ángeles María"); await p2.fill("#correo", "maria.angeles@alumnos.udg.mx"); await p2.click("#enviar");
     await p2.waitForSelector("#listo:not([hidden])");
+  });
+  // ---------------- PASO 7B: pulido del registro (360 px, mobile-first)
+  await prueba("PASO 7B · registro: campos con etiqueta, ayuda, ejemplo ficticio, atributos móviles, fuente ≥ 16 px y objetivos táctiles ≥ 48 px", async () => {
+    const q = await nuevaPagina({ viewport: { width: 360, height: 740 } }); await q.goto(`${BASE}/index.html?emulador`);
+    await q.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto");
+    const info = await q.evaluate(() => Object.fromEntries(["nombre", "correo"].map((id) => { const i = document.getElementById(id), cs = getComputedStyle(i);
+      return [id, { ac: i.autocomplete, im: i.inputMode, cap: i.getAttribute("autocapitalize"), corr: i.getAttribute("autocorrect"), ph: i.placeholder, fs: parseFloat(cs.fontSize), h: i.getBoundingClientRect().height,
+        etiqueta: !!document.querySelector(`label[for=${id}]`)?.textContent.trim(), ayuda: document.getElementById(id + "-ayuda").textContent.trim() }]; })));
+    assert.equal(info.nombre.ac, "name"); assert.equal(info.nombre.cap, "words"); assert.equal(info.nombre.corr, "off");
+    assert.equal(info.correo.ac, "email"); assert.equal(info.correo.im, "email"); assert.equal(info.correo.cap, "none"); assert.equal(info.correo.corr, "off");
+    assert.match(info.nombre.ph, /^Ej\.: /); assert.match(info.correo.ph, /@alumnos\.udg\.mx$/);
+    assert.match(info.nombre.ayuda, /Con ambos apellidos, como aparece en tu lista/);
+    for (const k of ["nombre", "correo"]) { assert.ok(info[k].fs >= 16, `fuente ${k}: ${info[k].fs}`); assert.ok(info[k].h >= 48, `alto ${k}: ${info[k].h}`); assert.ok(info[k].etiqueta); }
+    const b = await q.locator("#enviar").boundingBox(), campo = await q.locator("#nombre").boundingBox();
+    assert.ok(b.height >= 48 && b.width >= campo.width - 1, `botón ancho y alto: ${b.width}×${b.height}`);
+    const orden = await q.evaluate(() => ["h1", ".lead", "#nombre", "#correo", "#enviar", ".privacidad"].map((s) => document.querySelector(s).getBoundingClientRect().top));
+    assert.deepEqual([...orden].sort((x, y) => x - y), orden, "jerarquía: título, frase, dos campos, botón y privacidad debajo");
+    assert.equal(await q.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true); await q.context().close();
+  });
+  await prueba("PASO 7B · registro: la validación ocurre al salir del campo y al enviar (no en cada tecla), con foco en el primer error", async () => {
+    const q = await nuevaPagina(); await q.goto(`${BASE}/index.html?emulador`);
+    await q.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto");
+    await q.click("#correo"); await q.keyboard.type("x@gmai", { delay: 20 });
+    assert.equal(await q.isHidden("#correo-error"), true, "mientras se escribe no aparece el error");
+    await q.press("#correo", "Tab"); assert.equal(await q.isVisible("#correo-error"), true);
+    assert.match(await q.textContent("#correo-error"), /@alumnos\.udg\.mx/);
+    await q.fill("#correo", "ok@alumnos.udg.mx"); assert.equal(await q.isHidden("#correo-error"), true, "al corregirlo el error se retira");
+    await q.fill("#correo", "x@gmail.com"); await q.click("#nombre"); await q.fill("#nombre", ""); await q.click("#enviar");
+    assert.equal(await q.evaluate(() => document.activeElement.id), "nombre", "foco en el primer error");
+    assert.equal(await q.isVisible("#nombre-error"), true); assert.equal(await q.isVisible("#correo-error"), true);
+    await q.context().close();
+  });
+  await prueba("PASO 7B · registro: el botón muestra «Inscribiendo…», queda deshabilitado (aria-busy) y no permite doble envío", async () => {
+    const q = await nuevaPagina(); await q.goto(`${BASE}/index.html?emulador`);
+    await q.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto");
+    await q.evaluate(() => { window.__t = []; new MutationObserver(() => window.__t.push([document.querySelector("#enviar").textContent, document.querySelector("#enviar").disabled])).observe(document.querySelector("#enviar"), { childList: true, subtree: true, attributes: true, characterData: true }); });
+    await q.fill("#nombre", "Persona Inventada Prueba"); await q.fill("#correo", "inventada@alumnos.udg.mx");
+    await q.dblclick("#enviar");
+    await q.waitForFunction(() => /No pudimos completar/.test(document.querySelector("#aviso").textContent));
+    const t = await q.evaluate(() => window.__t);
+    assert.ok(t.some(([x, d]) => x === "Inscribiendo…" && d === true), JSON.stringify(t));
+    assert.equal(await q.textContent("#enviar"), "Inscribir mi linfocito"); assert.equal(await q.isDisabled("#enviar"), false);
+    await q.context().close();
+  });
+  await prueba("PASO 7B · registro: confirmación con «Ver el sorteo en vivo» como acción principal y la nota «Guarda este enlace…»", async () => {
+    assert.equal(await p2.isVisible("#listo"), true);
+    const a = await p2.locator("#ver-en-vivo").boundingBox();
+    assert.ok(a.height >= 48 && a.width > 250, `${a.width}×${a.height}`);
+    assert.match(await p2.textContent("#listo"), /Guarda este enlace para el día del sorteo\./);
+    assert.ok((await p2.locator("#copiar-vivo").count()) === 1);
+  });
+  await prueba("PASO 7B · registro: sin conexión muestra un aviso amable y con prefers-reduced-motion se anulan las animaciones", async () => {
+    const q = await nuevaPagina(); await q.emulateMedia({ reducedMotion: "reduce" }); await q.goto(`${BASE}/index.html?emulador`);
+    await q.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto");
+    assert.equal(await q.isHidden("#sin-conexion"), true);
+    await q.context().setOffline(true);
+    await q.waitForFunction(() => !document.querySelector("#sin-conexion").hidden);
+    assert.match(await q.textContent("#sin-conexion"), /Sin conexión a internet\. Tus datos siguen aquí/);
+    await q.context().setOffline(false); await q.waitForFunction(() => document.querySelector("#sin-conexion").hidden);
+    assert.equal(await q.evaluate(() => getComputedStyle(document.querySelector("#registro")).animationName), "none");
+    await q.context().close();
+  });
+  await prueba("PASO 7B · metaetiquetas: título por página, favicon, theme-color y Open Graph con URL absoluta e imagen PNG de 1200×630", async () => {
+    const titulos = new Set();
+    for (const f of ["index", "login", "panel", "sorteo", "en-vivo"]) {
+      const html = readFileSync(join(REPO, `${f}.html`), "utf8");
+      const t = html.match(/<title>(.+?)<\/title>/)?.[1]; assert.ok(t && t.length > 8, f); titulos.add(t);
+      assert.match(html, /<link rel="icon" href="favicon\.svg"/, `${f}: favicon`); assert.match(html, /<meta name="theme-color" content="#053043">/, `${f}: theme-color`);
+    }
+    assert.equal(titulos.size, 5, "un título distinto por página");
+    for (const f of ["index", "en-vivo"]) {
+      const html = readFileSync(join(REPO, `${f}.html`), "utf8");
+      assert.match(html, /<meta property="og:image" content="https:\/\/fungatec\.github\.io\/sorteo_inmuno\/img\/og\.png">/, f);
+      assert.match(html, /<meta property="og:title" content="[^"]+">/); assert.match(html, /<meta property="og:description" content="[^"]+">/); assert.match(html, /<meta property="og:url" content="https:\/\/fungatec\.github\.io\/sorteo_inmuno\//);
+    }
+    const png = readFileSync(join(REPO, "img/og.png"));
+    assert.equal(png.subarray(1, 4).toString(), "PNG"); assert.equal(png.readUInt32BE(16), 1200); assert.equal(png.readUInt32BE(20), 630);
+    assert.ok(existsSync(join(REPO, "favicon.svg")) && existsSync(join(REPO, "img/apple-touch-icon.png")));
   });
   await sembrar("config/estado", { registroAbierto: false });
   const p3 = await nuevaPagina(); await p3.goto(`${BASE}/index.html?emulador`);
@@ -310,6 +390,60 @@ async function subtitulos(pg, ms = 60000) {
     assert.equal((await leer("config/estado")).fields.registroAbierto.booleanValue, false);
     await p.click("#alternar"); await p.waitForFunction(() => document.querySelector("#etq-alternar").textContent === "Registro abierto");
     assert.equal(await p.getAttribute("#alternar", "aria-checked"), "true");
+  });
+  await prueba("PASO 7B · panel: cabecera «Registro: ABIERTO/CERRADO», «Inscritos X de Y» con barra de progreso y guía de 4 pasos con estado según los datos", async () => {
+    assert.equal((await p.textContent("#estado-cabecera")).trim(), "ABIERTO");
+    assert.equal(await p.textContent("#prog-x"), "3"); assert.equal(await p.textContent("#prog-y"), "3");
+    assert.equal(await p.getAttribute("#progreso", "aria-valuenow"), "100"); assert.equal(await p.getAttribute("#progreso", "role"), "progressbar");
+    assert.equal(await p.locator("#guia li").count(), 4);
+    const est = () => p.evaluate(() => [...document.querySelectorAll("#guia li")].map((li) => li.dataset.estado));
+    assert.deepEqual(await est(), ["hecho", "hecho", "pendiente", "pendiente"], "lista cargada, registro abierto con inscritos");
+    p.once("dialog", (d) => d.accept());
+    await p.click("#alternar"); await p.waitForFunction(() => document.querySelector("#estado-cabecera").textContent.trim() === "CERRADO");
+    assert.deepEqual(await est(), ["hecho", "hecho", "actual", "pendiente"], "cerrado y sin sorteos: toca sortear");
+    assert.equal(await p.textContent("#guia li:nth-child(3) .paso-estado"), "Siguiente");
+    await p.click("#alternar"); await p.waitForFunction(() => document.querySelector("#estado-cabecera").textContent.trim() === "ABIERTO");
+  });
+  await prueba("PASO 7B · panel: «Ir al sorteo» habilitado con participantes y enlaces con «Copiado»; toasts que se cierran al tocarlos", async () => {
+    assert.equal(await p.isDisabled("#ir-sorteo"), false);
+    await p.click("#copiar-registro");
+    await p.waitForFunction(() => document.querySelector("#copiar-registro").textContent === "Copiado ✓");
+    assert.ok((await p.textContent("#aviso")).includes(`${BASE}/`) && /de registro copiado|de registro es/.test(await p.textContent("#aviso")));
+    assert.equal(await p.evaluate(() => getComputedStyle(document.querySelector("#aviso")).position), "fixed", "el aviso es un toast");
+    await p.click("#aviso"); assert.equal(await p.isHidden("#aviso"), true);
+    await p.click("#copiar-enlace"); await p.waitForFunction(() => document.querySelector("#copiar-enlace").textContent === "Copiado ✓");
+    await p.waitForFunction(() => document.querySelector("#copiar-registro").textContent === "Copiar enlace de registro");
+  });
+  await prueba("PASO 7B · panel: la zona de peligro va al final, separada, con el recordatorio de descargar antes el registro del sorteo", async () => {
+    const z = await p.evaluate(() => { const zona = document.querySelector(".zona-peligro"), otras = [...document.querySelectorAll("main > section.tarjeta")].filter((x) => x !== zona);
+      return { ultimo: otras.every((o) => o.compareDocumentPosition(zona) & Node.DOCUMENT_POSITION_FOLLOWING), texto: zona.textContent, borde: getComputedStyle(zona).borderTopColor }; });
+    assert.ok(z.ultimo); assert.match(z.texto, /Antes de vaciar, descarga el registro del sorteo/); assert.notEqual(z.borde, "rgb(211, 238, 240)");
+  });
+  await prueba("PASO 7B · panel (360 px): barra de acciones fija inferior y toasts por encima de ella", async () => {
+    const m = await p.context().newPage(); await m.setViewportSize({ width: 360, height: 740 });
+    await m.goto(`${BASE}/panel.html?emulador`); await m.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
+    const r = await m.evaluate(() => { const b = document.querySelector("#barra-acciones").getBoundingClientRect(); return { pos: getComputedStyle(document.querySelector("#barra-acciones")).position, abajo: Math.round(innerHeight - b.bottom), ancho: Math.round(b.width), h: Math.round(b.height), sw: document.documentElement.scrollWidth <= innerWidth }; });
+    assert.equal(r.pos, "fixed"); assert.ok(r.abajo <= 1 && r.ancho >= 358 && r.sw, JSON.stringify(r));
+    await m.click("#copiar-registro"); await m.waitForSelector("#aviso:not([hidden])");
+    const t = await m.evaluate(() => ({ toast: document.querySelector("#aviso").getBoundingClientRect().bottom, barra: document.querySelector("#barra-acciones").getBoundingClientRect().top }));
+    assert.ok(t.toast <= t.barra, JSON.stringify(t));
+    await m.close();
+  });
+  await prueba("PASO 7B · panel: códigos QR generados en el navegador (canvas con módulos oscuros) y mensaje amable si la librería no carga", async () => {
+    const m = await p.context().newPage(); await m.goto(`${BASE}/panel.html?emulador`); await m.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
+    if (process.env.QR_LIB) {
+      await m.click("#alternar-qr"); await m.waitForSelector("#qr-zona:not([hidden])");
+      await m.waitForFunction(() => { const c = document.querySelector("#qr-vivo"), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; for (let i = 0; i < d.length; i += 4) if (d[i] < 50) return true; return false; });
+      const oscuros = await m.evaluate(() => ["#qr-registro", "#qr-vivo"].map((id) => { const c = document.querySelector(id), d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 50) n++; return n; }));
+      assert.ok(oscuros.every((n) => n > 2000), oscuros.join(","));
+      assert.equal(await m.getAttribute("#alternar-qr", "aria-expanded"), "true");
+    } else console.log("   [info] QR_LIB no definido: se omite la comprobación del dibujo del QR");
+    const f = await p.context().newPage(); await f.context().route(/cdnjs\.cloudflare\.com\/.*qrcode\.min\.js/, (r) => r.abort());
+    await f.goto(`${BASE}/panel.html?emulador`); await f.waitForFunction(() => document.querySelector("#n-registrados").textContent !== "–");
+    await f.evaluate(() => { delete globalThis.qrcode; });
+    await f.click("#alternar-qr"); await f.waitForFunction(() => !document.querySelector("#qr-aviso").hidden);
+    assert.match(await f.textContent("#qr-aviso"), /No se pudo cargar el generador de códigos QR/); assert.equal(await f.isHidden("#qr-zona"), true);
+    await m.close(); await f.close();
   });
   await prueba("panel: cargar lista (colisión, rechazada, repetida) y guardar", async () => {
     await p.click("#tab-b-lista");
@@ -854,6 +988,12 @@ async function subtitulos(pg, ms = 60000) {
     assert.equal((await leer("config/estado")).fields.registroAbierto.booleanValue, false);
     assert.ok(await leer(`admins/${UID}`), "admins no se toca");
     assert.match(await w.textContent("#aviso"), /La transmisión en vivo quedó en espera/);
+    // PASO 7B: sin datos, «Ir al sorteo» queda deshabilitado con explicación y la guía vuelve al primer paso
+    await w.waitForFunction(() => document.querySelector("#ir-sorteo").disabled);
+    assert.match(await w.textContent("#ir-sorteo-ayuda"), /se habilita cuando haya al menos un participante inscrito/);
+    assert.equal(await w.getAttribute("#ir-sorteo", "aria-describedby"), "ir-sorteo-ayuda");
+    assert.equal(await w.evaluate(() => [...document.querySelectorAll("#guia li")].map((li) => li.dataset.estado).join()), "actual,pendiente,pendiente,hecho");
+    assert.match(await w.textContent("#participantes"), /Todavía no hay participantes inscritos/);
     await w.close();
     // PASO 6: «Vaciar datos» deja publico/sorteo en {estado:"espera"} sin ganadorMascara (y el espectador vuelve a «Esperando el sorteo…»)
     const pub = await leer("publico/sorteo");

@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#053043">
   <meta name="robots" content="noindex">
-  <title>Panel · Sorteo Inmunobiología</title>
+  <title>Panel de administración · Sorteo de Inmunobiología</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
@@ -16,30 +17,63 @@
   <header class="barra">
     <strong>Panel de administración</strong>
     <nav aria-label="Administración">
-      <a href="sorteo.html">Ir al sorteo</a>
       <button type="button" class="secundario" id="salir">Salir</button>
     </nav>
   </header>
 
-  <main class="ancho" id="contenido" tabindex="-1" hidden>
-    <div id="aviso" class="aviso" hidden></div>
+  <main class="ancho con-barra" id="contenido" tabindex="-1" hidden>
+    <div id="aviso" class="aviso" data-toast hidden></div>
 
-    <section class="tarjeta" aria-labelledby="t-registro">
-      <h2 id="t-registro">Registro de participantes</h2>
-      <div class="interruptor">
-        <button type="button" role="switch" aria-checked="false" aria-labelledby="etq-alternar" id="alternar" disabled></button>
-        <span id="etq-alternar">Consultando…</span>
+    <section class="tarjeta estado-panel" aria-labelledby="t-registro">
+      <div class="estado-fila">
+        <div>
+          <h2 id="t-registro">Registro: <span class="insignia-estado" id="estado-cabecera" data-estado="desconocido">…</span></h2>
+          <div class="interruptor">
+            <button type="button" role="switch" aria-checked="false" aria-labelledby="etq-alternar" id="alternar" disabled></button>
+            <span id="etq-alternar">Consultando…</span>
+          </div>
+        </div>
+        <div>
+          <p class="progreso-texto">Inscritos <b id="prog-x">–</b> de <b id="prog-y">–</b></p>
+          <div class="progreso" id="progreso" role="progressbar" aria-label="Inscritos de la lista de la clase" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i></i></div>
+        </div>
       </div>
-      <div class="fila-botones">
-        <button type="button" class="secundario" id="copiar-enlace">Copiar enlace de transmisión</button>
-      </div>
-      <p class="suave">Quien tenga ese enlace verá en su celular el avance del sorteo y la máscara del ganador (por ejemplo, «Marta E. R.»).</p>
       <div class="resumen" aria-label="Resumen">
         <div class="dato"><b id="n-lista">–</b><span>nombres en la lista</span></div>
         <div class="dato"><b id="n-registrados">–</b><span>linfocitos inscritos</span></div>
         <div class="dato"><b id="n-pendientes">–</b><span>de la lista sin inscribir</span></div>
         <div class="dato"><b id="n-alertas">–</b><span>con advertencia</span></div>
       </div>
+    </section>
+
+    <div class="barra-acciones" id="barra-acciones">
+      <button type="button" id="ir-sorteo" aria-describedby="ir-sorteo-ayuda" disabled>Ir al sorteo</button>
+      <button type="button" class="secundario" id="copiar-registro">Copiar enlace de registro</button>
+    </div>
+
+    <section class="tarjeta" aria-labelledby="t-guia">
+      <h2 id="t-guia">Guía del evento</h2>
+      <ol class="guia" id="guia">
+        <li data-paso="lista" data-estado="pendiente"><span class="paso-num" aria-hidden="true">1</span><span><span class="titulo-paso">Cargar la lista de la clase</span><span class="detalle"></span></span><span class="paso-estado">Pendiente</span></li>
+        <li data-paso="abrir" data-estado="pendiente"><span class="paso-num" aria-hidden="true">2</span><span><span class="titulo-paso">Abrir el registro</span><span class="detalle"></span></span><span class="paso-estado">Pendiente</span></li>
+        <li data-paso="sortear" data-estado="pendiente"><span class="paso-num" aria-hidden="true">3</span><span><span class="titulo-paso">Cerrar el registro y sortear</span><span class="detalle"></span></span><span class="paso-estado">Pendiente</span></li>
+        <li data-paso="vaciar" data-estado="pendiente"><span class="paso-num" aria-hidden="true">4</span><span><span class="titulo-paso">Descargar el registro y vaciar los datos</span><span class="detalle"></span></span><span class="paso-estado">Pendiente</span></li>
+      </ol>
+      <p class="suave ayuda-sorteo" id="ir-sorteo-ayuda">Cargando…</p>
+    </section>
+
+    <section class="tarjeta" aria-labelledby="t-enlaces">
+      <h2 id="t-enlaces">Enlaces para compartir</h2>
+      <p class="suave">El enlace de transmisión permite ver desde el celular el avance del sorteo y la máscara del ganador (por ejemplo, «Marta E. R.»).</p>
+      <div class="fila-botones">
+        <button type="button" class="secundario" id="copiar-enlace">Copiar enlace de transmisión</button>
+        <button type="button" class="secundario" id="alternar-qr" aria-expanded="false" aria-controls="qr-zona">Mostrar códigos QR</button>
+      </div>
+      <div class="qr-rejilla" id="qr-zona" hidden>
+        <figure><canvas id="qr-registro" role="img" aria-label="Código QR del enlace de registro" width="220" height="220"></canvas><figcaption>Registro</figcaption></figure>
+        <figure><canvas id="qr-vivo" role="img" aria-label="Código QR del enlace de la transmisión en vivo" width="220" height="220"></canvas><figcaption>Transmisión en vivo</figcaption></figure>
+      </div>
+      <p class="suave" id="qr-aviso" hidden></p>
     </section>
 
     <div class="tabs" role="tablist" aria-label="Secciones">
@@ -62,7 +96,11 @@
             <th scope="col">Nombre</th><th scope="col">Correo</th><th scope="col">Origen</th><th scope="col">Fecha</th>
             <th scope="col"><span class="solo-lectores">Acciones</span></th>
           </tr></thead>
-          <tbody id="participantes"></tbody>
+          <tbody id="participantes">
+            <tr class="esqueleto" aria-hidden="true"><td colspan="5"><i></i></td></tr>
+            <tr class="esqueleto" aria-hidden="true"><td colspan="5"><i></i></td></tr>
+            <tr class="esqueleto" aria-hidden="true"><td colspan="5"><i></i></td></tr>
+          </tbody>
         </table>
       </div>
     </section>
@@ -96,8 +134,9 @@
     </section>
 
     <section class="tarjeta zona-peligro" aria-labelledby="t-peligro">
-      <h2 id="t-peligro">Al terminar el evento</h2>
-      <p class="suave">Primero descarga la constancia del sorteo (fecha, ronda, total y ganador de cada ronda). Después, vaciar borra todos los datos personales: lista, participantes, correos y sorteos. No se puede deshacer.</p>
+      <h2 id="t-peligro">Zona de peligro · al terminar el evento</h2>
+      <p><b>Antes de vaciar, descarga el registro del sorteo</b> (fecha, ronda, total y ganador de cada ronda): después ya no existirá.</p>
+      <p class="suave">Vaciar borra todos los datos personales: lista, participantes, correos y sorteos, y deja la transmisión en espera. No se puede deshacer.</p>
       <div class="fila-botones">
         <button type="button" class="secundario" id="descargar-registro">Descargar registro del sorteo</button>
         <button type="button" class="peligro" id="abrir-vaciar">Vaciar datos al terminar el evento</button>

@@ -31,7 +31,7 @@ Necesitas: un celular **con datos móviles** (no la Wi-Fi del evento), una lapto
    - [ ] Con otro usuario (p. ej. `admin`) o contraseña mala: «Usuario o contraseña incorrectos» (el mismo mensaje en ambos casos). El usuario con espacios o en mayúsculas (`  ADMIN123`) sí entra.
    - [ ] Si ves un mensaje de «clave de API», «método de acceso desactivado», «dominio no autorizado» o «sin conexión», es de configuración o red, no de la contraseña; abre la consola del navegador (F12) y busca `[login] error de Firebase:` para ver el código.
 2. [ ] **Lista de prueba:** Panel → Lista de la clase → pega 6 nombres ficticios en MAYÚSCULAS y sin acentos, algunos con viñeta o punto final (`• ANA PEREZ-GIL.`), uno con partícula (`ROSA DE LOS RIOS MORA`), y uno repetido con otro orden → *Revisar lista*. Comprueba el total leído, que la vista previa muestre los 3 primeros con la máscara (`Ana P. G.`…), que detecte la colisión y que **no** la guarde. Guarda y confirma en Firestore que el nombre quedó **sin** viñeta ni punto.
-3. [ ] **Abrir el registro** (interruptor del panel).
+3. [ ] **Abrir el registro** (interruptor del panel). Revisa la guía de 4 pasos y la barra «Inscritos X de Y»; prueba «Copiar enlace de registro» y «Mostrar códigos QR» (el QR del registro debe abrir la página al escanearlo con el celular).
 4. [ ] **En el celular** abre el enlace de Pages y prueba:
    - [ ] Registro válido con un nombre de la lista (otro orden, sin acentos) y un correo `@alumnos.udg.mx` → ves «{Nombre}, tu linfocito T virgen ya patrulla el ganglio linfático…» con la animación del linfocito cruzando la vénula.
    - [ ] Correo `@gmail.com` → «El correo debe ser @alumnos.udg.mx» (sin enviar).
