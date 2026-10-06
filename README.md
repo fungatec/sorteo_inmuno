@@ -13,6 +13,8 @@ App web estática (GitHub Pages) con Firebase (Firestore + Auth) para registrar 
 5. En el evento: cierra el registro, abre *Ir al sorteo*, pulsa **F** (pantalla completa), haz un **ensayo** (casilla marcada) y luego los sorteos reales. *Activar otro linfocito* (nueva ronda) excluye a los ganadores previos. En pantalla sale una máscara `Nombre I. I.`; *Mostrar nombre completo* (tecla **N**) revela el nombre oficial. Atajos: **Espacio** inicia, **S** salta de escena, **C** subtítulos, **I** ficha inmunológica, **F** pantalla completa, **N** nombre completo.
 6. **Al terminar el evento:** pulsa **Descargar registro del sorteo** (constancia en `.txt`) y después **Vaciar datos** en el panel (escribe `BORRAR`). Es lo que cumple el aviso de privacidad del registro («se eliminarán al terminar el evento»).
 
+**Entrada de estudiantes y acceso de administración:** la URL raíz (`/sorteo_inmuno/`) abre **siempre** el registro (o «El registro está cerrado»), aunque haya una sesión de admin iniciada: `index.html` nunca redirige según la sesión. El acceso de administración es el enlace discreto «Administración» de la cabecera (va a `login.html`, o a `panel.html` si ya hay sesión de admin). `login.html`, `panel.html` y `sorteo.html` llevan `<meta name="robots" content="noindex">` para que los buscadores no los listen. **Ocultar el enlace no es seguridad:** las URL de administración son públicas (el repositorio lo es); la protección real son las reglas de Firestore y la contraseña de la cuenta admin.
+
 ## Pasos manuales pendientes
 
 > Lista completa para publicar, probar en el celular y operar el evento: [`docs/CHECKLIST_PUBLICACION.md`](docs/CHECKLIST_PUBLICACION.md).

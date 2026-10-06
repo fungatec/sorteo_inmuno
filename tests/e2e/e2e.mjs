@@ -245,6 +245,36 @@ async function subtitulos(pg, ms = 60000) {
     await p.fill("#usuario", " Admin123 "); await p.fill("#contrasena", PASS); await p.click("#entrar");
     await p.waitForURL(/panel\.html/);
   });
+  await prueba("PASO 7 · con sesión de admin, la raíz sigue mostrando el registro (sin redirigir); «Administración» apunta a panel.html", async () => {
+    const r = await p.context().newPage(); r.errores = []; r.on("pageerror", (e) => r.errores.push(e.message));
+    await r.goto(`${BASE}/?emulador`);
+    await r.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto");
+    await r.waitForFunction(() => document.querySelector("#enlace-admin").getAttribute("href") === "panel.html");   // la sesión ya se resolvió
+    await r.waitForTimeout(1500);
+    assert.equal(new URL(r.url()).pathname, "/", "no hubo redirección"); assert.equal(await r.isVisible("#registro"), true);
+    assert.match(await r.textContent("#enlace-admin"), /^Administración$/);
+    const texto = await r.evaluate(() => document.body.innerText);
+    for (const t of ["Panel", "Ir al sorteo", "Vaciar", "Lista de la clase", "Participantes", "Ensayo", "Activar otro linfocito"]) assert.ok(!texto.includes(t), `la página de estudiantes no debe mostrar «${t}»`);
+    await r.click("#enlace-admin"); await r.waitForURL(/panel\.html/);
+    // y sin registro abierto, aun con sesión de admin: la tarjeta de «registro cerrado», no el panel
+    await sembrar("config/estado", { registroAbierto: false });
+    await r.goto(`${BASE}/?emulador`); await r.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro cerrado");
+    assert.equal(new URL(r.url()).pathname, "/"); assert.equal(await r.isVisible("#cerrado"), true);
+    await sembrar("config/estado", { registroAbierto: true });
+    assert.deepEqual(r.errores, []); await r.close();
+  });
+  await prueba("PASO 7 · sin sesión: la raíz muestra el registro y «Administración» apunta a login.html", async () => {
+    const r = await nuevaPagina(); await r.goto(`${BASE}/?emulador`);
+    await r.waitForFunction(() => document.querySelector("#estado-texto").textContent === "Registro abierto"); await r.waitForTimeout(1000);
+    assert.equal(new URL(r.url()).pathname, "/"); assert.equal(await r.getAttribute("#enlace-admin", "href"), "login.html");
+    assert.equal(await r.isVisible("#enlace-admin"), true);
+    assert.ok((await r.locator("#enlace-admin").boundingBox()).height >= 44, "objetivo táctil suficiente");
+    await r.close();
+  });
+  await prueba("PASO 7 · login, panel y sorteo llevan <meta name=\"robots\" content=\"noindex\">; el registro no", async () => {
+    for (const f of ["login", "panel", "sorteo"]) assert.match(readFileSync(join(REPO, `${f}.html`), "utf8"), /<meta name="robots" content="noindex">/, f);
+    assert.doesNotMatch(readFileSync(join(REPO, "index.html"), "utf8"), /noindex/);
+  });
   assert.deepEqual(p.errores, []);
 }
 

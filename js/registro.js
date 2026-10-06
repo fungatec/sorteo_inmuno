@@ -3,6 +3,7 @@ import { configPendiente } from "./firebase.js";
 import { leerRegistroAbierto, crearParticipante, ErrorValidacion } from "./datos.js";
 import { mensajeErrorNombre, mensajeErrorCorreo, limpiarNombre } from "./normalizar.js";
 import { $, aviso, avisoConfigPendiente, validarEnVivo } from "./ui.js";
+import { sesionAdminActiva } from "./auth.js";
 
 // Mensaje único (decisión de privacidad): Firestore no distingue las causas y no abrimos lecturas.
 const MENSAJE_RECHAZO =
@@ -67,3 +68,9 @@ form.addEventListener("submit", async (e) => {
 });
 
 iniciar();
+
+// Esta página NUNCA redirige según la sesión: siempre es el registro. Solo el enlace discreto «Administración» cambia de
+// destino (panel.html si ya hay sesión de admin, login.html si no). Ocultar el enlace no es seguridad: la protección son las reglas.
+if (!configPendiente) {
+  sesionAdminActiva().then((ok) => { if (ok) $("#enlace-admin").href = "panel.html"; }).catch(() => {});
+}

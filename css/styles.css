@@ -285,3 +285,7 @@ button.ico { min-width: 40px; padding: .4rem; border-radius: 99px; font-family: 
 .revelado-ev p { margin: 0; font-size: 1rem; font-weight: 600; color: var(--celeste); }
 .pie-ev { margin-top: 1rem; font-size: .8rem; text-align: center; }
 @media (prefers-reduced-motion: reduce) { .mascara-ev { animation: none; } }
+
+/* ---- Paso 7: cabecera discreta del registro (enlace «Administración») ---- */
+.cabecera-registro { display: flex; justify-content: flex-end; width: min(100% - 2 * var(--espacio), 34rem); margin: 0 auto; padding-top: .25rem; }
+a.enlace-admin { display: inline-flex; align-items: center; min-height: 48px; padding: 0 .25rem; font-size: .85rem; color: var(--suave); }
